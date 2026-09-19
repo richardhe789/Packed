@@ -43,11 +43,7 @@ type Props = {
   onPlaceChange: (place: PlaceFields) => void;
 };
 
-function TrendGlyph({
-  dir,
-}: {
-  dir: "up" | "down" | "flat" | "none";
-}) {
+function TrendGlyph({ dir }: { dir: "up" | "down" | "flat" | "none" }) {
   if (dir === "up") return <ArrowUpRight size={16} aria-label="trending up" />;
   if (dir === "down")
     return <ArrowDownRight size={16} aria-label="trending down" />;
@@ -149,7 +145,12 @@ export default function DetailPanel({
               </button>
             </div>
 
-            <DensityBlock loc={loc} reading={reading} demoMode={demoMode} onPeekClick={sheetExpanded ? undefined : onExpand} />
+            <DensityBlock
+              loc={loc}
+              reading={reading}
+              demoMode={demoMode}
+              onPeekClick={sheetExpanded ? undefined : onExpand}
+            />
 
             <p
               className="rec-text peek-tip"
@@ -217,82 +218,86 @@ export default function DetailPanel({
                       max={100}
                       value={reading.density ?? 0}
                       className="dev-range"
-                      onChange={(e) =>
-                        onSlider(loc.id, Number(e.target.value))
-                      }
+                      onChange={(e) => onSlider(loc.id, Number(e.target.value))}
                     />
                   </label>
                 </div>
               ) : null}
 
-              <div className={`dev-panel embedded pin-editor${editPin ? " is-open" : ""}`}>
-                  <h3>Pin location</h3>
-                  <p className="dev-hint">
-                    Place name and Google Maps coordinates. The ESP32 still posts
-                    under the id in location.config.json.
-                  </p>
-                  <label className="place-field">
-                    <span>Place name</span>
-                    <input
-                      type="text"
-                      value={loc.label}
-                      autoComplete="off"
-                      onChange={(e) =>
-                        onPlaceChange({
-                          id: loc.id,
-                          label: e.target.value,
-                          latitude: loc.coords.lat,
-                          longitude: loc.coords.lng,
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="place-field">
-                    <span>Latitude</span>
-                    <input
-                      type="number"
-                      step="0.00001"
-                      min={-90}
-                      max={90}
-                      value={loc.coords.lat}
-                      onChange={(e) => {
-                        const latitude = Number(e.target.value);
-                        if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)
-                          return;
-                        onPlaceChange({
-                          id: loc.id,
-                          label: loc.label,
-                          latitude,
-                          longitude: loc.coords.lng,
-                        });
-                      }}
-                    />
-                  </label>
-                  <label className="place-field">
-                    <span>Longitude</span>
-                    <input
-                      type="number"
-                      step="0.00001"
-                      min={-180}
-                      max={180}
-                      value={loc.coords.lng}
-                      onChange={(e) => {
-                        const longitude = Number(e.target.value);
-                        if (
-                          !Number.isFinite(longitude) ||
-                          longitude < -180 ||
-                          longitude > 180
-                        )
-                          return;
-                        onPlaceChange({
-                          id: loc.id,
-                          label: loc.label,
-                          latitude: loc.coords.lat,
-                          longitude,
-                        });
-                      }}
-                    />
-                  </label>
+              <div
+                className={`dev-panel embedded pin-editor${editPin ? " is-open" : ""}`}
+              >
+                <h3>Pin location</h3>
+                <p className="dev-hint">
+                  Place name and Google Maps coordinates. The ESP32 still posts
+                  under the id in location.config.json.
+                </p>
+                <label className="place-field">
+                  <span>Place name</span>
+                  <input
+                    type="text"
+                    value={loc.label}
+                    autoComplete="off"
+                    onChange={(e) =>
+                      onPlaceChange({
+                        id: loc.id,
+                        label: e.target.value,
+                        latitude: loc.coords.lat,
+                        longitude: loc.coords.lng,
+                      })
+                    }
+                  />
+                </label>
+                <label className="place-field">
+                  <span>Latitude</span>
+                  <input
+                    type="number"
+                    step="0.00001"
+                    min={-90}
+                    max={90}
+                    value={loc.coords.lat}
+                    onChange={(e) => {
+                      const latitude = Number(e.target.value);
+                      if (
+                        !Number.isFinite(latitude) ||
+                        latitude < -90 ||
+                        latitude > 90
+                      )
+                        return;
+                      onPlaceChange({
+                        id: loc.id,
+                        label: loc.label,
+                        latitude,
+                        longitude: loc.coords.lng,
+                      });
+                    }}
+                  />
+                </label>
+                <label className="place-field">
+                  <span>Longitude</span>
+                  <input
+                    type="number"
+                    step="0.00001"
+                    min={-180}
+                    max={180}
+                    value={loc.coords.lng}
+                    onChange={(e) => {
+                      const longitude = Number(e.target.value);
+                      if (
+                        !Number.isFinite(longitude) ||
+                        longitude < -180 ||
+                        longitude > 180
+                      )
+                        return;
+                      onPlaceChange({
+                        id: loc.id,
+                        label: loc.label,
+                        latitude: loc.coords.lat,
+                        longitude,
+                      });
+                    }}
+                  />
+                </label>
               </div>
 
               <p className="privacy-note">
@@ -371,7 +376,11 @@ function DensityBlock({
         </div>
       </div>
       <p className="sub density-meta">
-        {hasData ? `${dens}/100` : loc.liveSensor ? "awaiting sensor" : "no data"}
+        {hasData
+          ? `${dens}/100`
+          : loc.liveSensor
+            ? "awaiting sensor"
+            : "no data"}
         {when ? ` · ${when}` : ""}
       </p>
       {showTelemetry ? (

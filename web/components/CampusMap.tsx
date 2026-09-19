@@ -60,7 +60,9 @@ export default function CampusMap({
 
   const [mapEpoch, setMapEpoch] = useState(0);
   const [pins, setPins] = useState<PinScreen[]>([]);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Imperative MapLibre — style URL (OpenFreeMap). Sync create avoids Strict Mode async races.
@@ -82,7 +84,10 @@ export default function CampusMap({
     });
 
     mapRef.current = map;
-    map.addControl(new NavigationControl({ showCompass: false }), "bottom-left");
+    map.addControl(
+      new NavigationControl({ showCompass: false }),
+      "bottom-left",
+    );
 
     const resize = () => {
       if (!cancelled) map.resize();
