@@ -21,6 +21,7 @@ type Props = {
   selectedId: string | null;
   bestId: string | null;
   demoMode: boolean;
+  sheetExpanded: boolean;
   onSelect: (id: string) => void;
 };
 
@@ -37,12 +38,20 @@ function ensureMapLibreWorker() {
   workerConfigured = true;
 }
 
+function mapBottomPad(expanded: boolean) {
+  if (typeof window === "undefined") return 0;
+  if (!window.matchMedia("(max-width: 51.1875rem)").matches) return 0;
+  if (expanded) return Math.min(window.innerHeight * 0.7, 560);
+  return 168;
+}
+
 export default function CampusMap({
   location,
   state,
   selectedId,
   bestId,
   demoMode,
+  sheetExpanded,
   onSelect,
 }: Props) {
   const reduceMotion = useReducedMotion();
@@ -159,6 +168,22 @@ export default function CampusMap({
       duration: 450,
     });
   }, [mapEpoch, location.coords.lat, location.coords.lng]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapEpoch === 0) return;
+    const apply = () => {
+      map.setPadding({
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: mapBottomPad(sheetExpanded),
+      });
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, [mapEpoch, sheetExpanded]);
 
   return (
     <div className="map-canvas">

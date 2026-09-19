@@ -19,8 +19,9 @@ import {
   type PlaceFields,
   type ReadingState,
 } from "@/lib/crowd";
-import { fetchLatestReadings } from "@/lib/supabase";
+import { fetchLatestReadings, fetchReadingHistory } from "@/lib/supabase";
 import DetailPanel from "@/components/DetailPanel";
+import type { HistoryPoint } from "@/lib/sim";
 import TopBar from "@/components/TopBar";
 
 const CampusMap = dynamic(() => import("@/components/CampusMap"), {
@@ -54,9 +55,12 @@ export default function PackedApp() {
       : "Live · fetching…",
   );
   const [liveLoading, setLiveLoading] = useState(false);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(
     SENSOR_LOCATION.id,
   );
+  const [editPin, setEditPin] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
 
   const liveGenerationRef = useRef(0);
   const liveAbortRef = useRef<AbortController | null>(null);
@@ -82,6 +86,7 @@ export default function PackedApp() {
     setDemoMode(true);
     setLiveLoading(false);
     setState(seeded);
+    setHistory([]);
     setMeta("Demo · one sensor pin · scrub density in the panel");
     setSelectedId(SENSOR_LOCATION.id);
     syncUrl(true);
@@ -90,6 +95,7 @@ export default function PackedApp() {
   const enterLive = useCallback(() => {
     setDemoMode(false);
     setState(emptyState());
+    setHistory([]);
     setMeta("Live · fetching…");
     setLiveLoading(true);
     setSelectedId(SENSOR_LOCATION.id);
@@ -155,6 +161,10 @@ export default function PackedApp() {
             return { id, latest, previous };
           }),
         );
+        const historyId = liveIds[0];
+        const historyRows = historyId
+          ? await fetchReadingHistory(historyId, 800, { signal })
+          : [];
 
         if (gen !== liveGenerationRef.current || signal.aborted) return;
 
@@ -171,6 +181,7 @@ export default function PackedApp() {
           }
           return next;
         });
+        setHistory(historyRows);
         setMeta(
           `Live · updated ${new Date().toLocaleTimeString()} · every ${POLL_MS / 1000}s`,
         );
@@ -224,11 +235,19 @@ export default function PackedApp() {
   }
 
   return (
-    <div className="map-shell">
+    <div
+      className="map-shell"
+      data-sheet-expanded={sheetExpanded ? "true" : "false"}
+    >
       <TopBar
         demoMode={demoMode}
+        editPin={editPin}
         onDemo={enterDemo}
         onLive={enterLive}
+        onToggleEditPin={() => {
+          setEditPin((v) => !v);
+          setSheetExpanded(true);
+        }}
       />
 
       <div className="map-stage">
@@ -238,7 +257,11 @@ export default function PackedApp() {
           selectedId={selectedId}
           bestId={bestId}
           demoMode={demoMode}
-          onSelect={setSelectedId}
+          sheetExpanded={sheetExpanded}
+          onSelect={(id) => {
+            setSelectedId(id);
+            setSheetExpanded(true);
+          }}
         />
 
         <DetailPanel
@@ -248,9 +271,14 @@ export default function PackedApp() {
           recommendation={recommendation}
           bestId={bestId}
           demoMode={demoMode}
+          editPin={editPin}
+          sheetExpanded={sheetExpanded}
           meta={meta}
           liveLoading={liveLoading}
+          history={history}
           onClose={() => setSelectedId(null)}
+          onCollapse={() => setSheetExpanded(false)}
+          onExpand={() => setSheetExpanded(true)}
           onSlider={onSlider}
           onPlaceChange={setPlace}
         />

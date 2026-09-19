@@ -191,9 +191,15 @@ Table `public.readings`:
 | `packet_count` | int |
 | `density` | int 0–100 |
 | `location` | text |
+| `src` | text (`esp32` on `readings`, `sim` on `sim_readings`) |
+
+Fake movement lives in a separate table, `public.sim_readings` (same columns, no ESP32 rows). Open **Table Editor → `sim_readings`**. Re-seed with [`supabase/sim_readings.sql`](supabase/sim_readings.sql). Remove later with:
+
+```sql
+delete from public.sim_readings;
+```
 
 RLS: anon can **`SELECT`** only (Live dashboard). **Inserts** go through the `ingest-reading` Edge Function (`supabase/functions/ingest-reading/`), which checks `x-device-key` against the `DEVICE_INGEST_KEY` secret and writes with the service role.
-
 Smoke tests (replace env vars locally — do not commit values):
 
 ```bash

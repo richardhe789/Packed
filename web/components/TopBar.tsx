@@ -1,23 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Moon, Radio, Sun } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { MapPin, Moon, MoreVertical, Radio, Sun } from "lucide-react";
 import { applyTheme, resolveTheme, toggleTheme, type Theme } from "@/lib/theme";
 
 type Props = {
   demoMode: boolean;
+  editPin: boolean;
   onDemo: () => void;
   onLive: () => void;
+  onToggleEditPin: () => void;
 };
 
-export default function TopBar({ demoMode, onDemo, onLive }: Props) {
+export default function TopBar({
+  demoMode,
+  editPin,
+  onDemo,
+  onLive,
+  onToggleEditPin,
+}: Props) {
   const [theme, setTheme] = useState<Theme>("light");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuId = useId();
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const initial = resolveTheme();
     applyTheme(initial);
     setTheme(initial);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
 
   return (
     <header className="map-topbar">
@@ -54,7 +81,7 @@ export default function TopBar({ demoMode, onDemo, onLive }: Props) {
 
       <h1 className="map-topbar-title">PACKED</h1>
 
-      <div className="topbar-actions">
+      <div className="topbar-actions" ref={wrapRef}>
         <button
           type="button"
           className={`theme-switch${theme === "dark" ? " is-dark" : ""}`}
@@ -71,7 +98,7 @@ export default function TopBar({ demoMode, onDemo, onLive }: Props) {
           <span className="theme-switch-thumb" aria-hidden />
         </button>
 
-        <div className="mode-toggle" role="group" aria-label="Data mode">
+        <div className="mode-toggle desktop-mode" role="group" aria-label="Data mode">
           <button
             type="button"
             className={`mode-btn${demoMode ? " active" : ""}`}
@@ -90,6 +117,58 @@ export default function TopBar({ demoMode, onDemo, onLive }: Props) {
             Live
           </button>
         </div>
+
+        <button
+          type="button"
+          className="icon-btn overflow-btn"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          aria-controls={menuId}
+          onClick={() => setMenuOpen((o) => !o)}
+        >
+          <MoreVertical size={18} />
+        </button>
+
+        {menuOpen ? (
+          <div id={menuId} className="overflow-menu" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              className={`overflow-item${demoMode ? " is-active" : ""}`}
+              onClick={() => {
+                onDemo();
+                setMenuOpen(false);
+              }}
+            >
+              Demo
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={`overflow-item${!demoMode ? " is-active" : ""}`}
+              onClick={() => {
+                onLive();
+                setMenuOpen(false);
+              }}
+            >
+              <Radio size={14} aria-hidden />
+              Live
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={`overflow-item${editPin ? " is-active" : ""}`}
+              aria-pressed={editPin}
+              onClick={() => {
+                onToggleEditPin();
+                setMenuOpen(false);
+              }}
+            >
+              <MapPin size={14} aria-hidden />
+              {editPin ? "Hide pin editor" : "Edit pin"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </header>
   );
