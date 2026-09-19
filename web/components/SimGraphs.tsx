@@ -1,12 +1,18 @@
 "use client";
 
-import { simHistory } from "@/lib/sim";
+import { useEffect, useState } from "react";
+import { POLL_MS } from "@/lib/crowd";
+import { simHistory, type HistoryPoint } from "@/lib/sim";
+import { fetchReadingHistory } from "@/lib/supabase";
 
-const ROWS = simHistory(24);
-const VALUES = ROWS.map((r) => r.density);
 const VB = { w: 320, h: 208, l: 40, r: 8, t: 8, b: 34 };
 const Y_MIN = 0;
 const Y_MAX = 100;
+
+type Props = {
+  locationId: string;
+  live: boolean;
+};
 
 function clockLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString([], {
@@ -15,28 +21,81 @@ function clockLabel(iso: string): string {
   });
 }
 
-function plot(values: number[], y0: number, y1: number) {
+function plot(rows: HistoryPoint[], y0: number, y1: number) {
   const span = y1 - y0;
   const innerW = VB.w - VB.l - VB.r;
   const innerH = VB.h - VB.t - VB.b;
-  const pts = values.map((v, i) => ({
-    x: VB.l + (i / (values.length - 1)) * innerW,
-    y: VB.t + (1 - (v - y0) / span) * innerH,
-    v,
+  const times = rows.map((r) => Date.parse(r.created_at));
+  const t0 = times[0];
+  const t1 = times[times.length - 1];
+  const tspan = Math.max(1, t1 - t0);
+  const pts = rows.map((r, i) => ({
+    x: VB.l + ((times[i] - t0) / tspan) * innerW,
+    y: VB.t + (1 - (r.density - y0) / span) * innerH,
+    v: r.density,
   }));
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => y0 + t * span);
-  const xTicks = [0, 0.25, 0.5, 0.75, 1].map((t) =>
-    Math.round(t * (values.length - 1)),
-  );
+  const xTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => ({
+    x: VB.l + t * innerW,
+    iso: new Date(t0 + t * tspan).toISOString(),
+  }));
   return { pts, yTicks, xTicks, innerH };
 }
 
-export default function SimGraphs() {
-  const { pts, yTicks, xTicks, innerH } = plot(VALUES, Y_MIN, Y_MAX);
+export default function SimGraphs({ locationId, live }: Props) {
+  const [rows, setRows] = useState<HistoryPoint[]>(() =>
+    live ? [] : simHistory(24),
+  );
+
+  useEffect(() => {
+    if (!live) {
+      setRows(simHistory(24));
+      return;
+    }
+
+    let cancelled = false;
+    const controller = { current: new AbortController() };
+
+    const load = async () => {
+      controller.current.abort();
+      controller.current = new AbortController();
+      const { signal } = controller.current;
+      try {
+        const data = await fetchReadingHistory(locationId, 240, { signal });
+        if (!cancelled && !signal.aborted) setRows(data);
+      } catch {
+        if (signal.aborted || cancelled) return;
+      }
+    };
+
+    void load();
+    const intervalId = window.setInterval(() => {
+      void load();
+    }, POLL_MS);
+
+    return () => {
+      cancelled = true;
+      controller.current.abort();
+      window.clearInterval(intervalId);
+    };
+  }, [locationId, live]);
+
+  if (rows.length < 2) {
+    return (
+      <section className="detail-panel-inner sim-graphs" aria-label="People over time">
+        <p className="sim-graphs-title">People over time</p>
+        <p className="dev-hint">Need at least two ESP32 readings to graph.</p>
+      </section>
+    );
+  }
+
+  const { pts, yTicks, xTicks, innerH } = plot(rows, Y_MIN, Y_MAX);
   const baseline = VB.t + innerH;
   const line = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const area = `${pts[0].x.toFixed(1)},${baseline} ${line} ${pts[pts.length - 1].x.toFixed(1)},${baseline}`;
   const yTitleAt = VB.t + innerH / 2;
+  const markAll = pts.length <= 48;
+  const last = pts[pts.length - 1];
 
   return (
     <section className="detail-panel-inner sim-graphs" aria-label="People over time">
@@ -45,7 +104,11 @@ export default function SimGraphs() {
           className="sim-graphs-chart"
           viewBox={`0 0 ${VB.w} ${VB.h}`}
           role="img"
-          aria-label="People over time, simulated XY plot"
+          aria-label={
+            live
+              ? "People over time from ESP32 readings"
+              : "People over time, simulated XY plot"
+          }
         >
           {yTicks.map((tick, i) => {
             const y =
@@ -67,28 +130,25 @@ export default function SimGraphs() {
               </g>
             );
           })}
-          {xTicks.map((idx) => {
-            const p = pts[idx];
-            return (
-              <g key={`x-${idx}`}>
-                <line
-                  className="sim-graphs-grid"
-                  x1={p.x}
-                  x2={p.x}
-                  y1={VB.t}
-                  y2={baseline}
-                />
-                <text
-                  className="sim-graphs-tick"
-                  x={p.x}
-                  y={VB.h - 8}
-                  textAnchor="middle"
-                >
-                  {clockLabel(ROWS[idx].created_at)}
-                </text>
-              </g>
-            );
-          })}
+          {xTicks.map((tick, i) => (
+            <g key={`x-${i}`}>
+              <line
+                className="sim-graphs-grid"
+                x1={tick.x}
+                x2={tick.x}
+                y1={VB.t}
+                y2={baseline}
+              />
+              <text
+                className="sim-graphs-tick"
+                x={tick.x}
+                y={VB.h - 8}
+                textAnchor="middle"
+              >
+                {clockLabel(tick.iso)}
+              </text>
+            </g>
+          ))}
           <line
             className="sim-graphs-axis"
             x1={VB.l}
@@ -105,9 +165,13 @@ export default function SimGraphs() {
           />
           <polygon className="sim-graphs-area" points={area} />
           <polyline className="sim-graphs-line" points={line} />
-          {pts.map((p, i) => (
-            <circle key={i} className="sim-graphs-pt" cx={p.x} cy={p.y} r={2.4} />
-          ))}
+          {markAll
+            ? pts.map((p, i) => (
+                <circle key={i} className="sim-graphs-pt" cx={p.x} cy={p.y} r={2.4} />
+              ))
+            : (
+                <circle className="sim-graphs-pt" cx={last.x} cy={last.y} r={2.4} />
+              )}
           <text
             className="sim-graphs-axis-label"
             x={12}
