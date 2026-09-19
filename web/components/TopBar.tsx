@@ -40,7 +40,7 @@ export default function TopBar({
         <div className="brand-lockup-text">
           <span className={`live-dot${!demoMode ? " on" : ""}`} aria-hidden />
           <div>
-            <p className="brand">Campus Crowd</p>
+            <p className="brand">Packed</p>
             <p className="brand-sub">Virginia Tech · Blacksburg</p>
           </div>
         </div>

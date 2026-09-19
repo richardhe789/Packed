@@ -17,7 +17,7 @@ const firaCode = Fira_Code({
 });
 
 export const metadata: Metadata = {
-  title: "Campus Crowd — Dining Hall Status",
+  title: "Packed — Dining Hall Status",
   description:
     "Should I go now? Live busyness from ambient WiFi density near dining halls.",
 };

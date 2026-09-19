@@ -22,7 +22,7 @@ const CampusMap = dynamic(() => import("@/components/CampusMap"), {
   loading: () => <div className="map-canvas map-loading">Loading campus map…</div>,
 });
 
-export default function CampusCrowdApp() {
+export default function PackedApp() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

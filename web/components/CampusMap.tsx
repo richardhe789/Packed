@@ -75,7 +75,6 @@ export default function CampusMap({
       center: [CAMPUS_VIEW.longitude, CAMPUS_VIEW.latitude],
       zoom: CAMPUS_VIEW.zoom,
       attributionControl: { compact: true },
-      failIfMajorPerformanceCaveat: false,
     });
 
     mapRef.current = map;
