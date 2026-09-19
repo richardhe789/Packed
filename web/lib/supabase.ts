@@ -17,6 +17,7 @@ export function getSupabaseConfig(): { url: string; anonKey: string } {
 
 export async function fetchLatestReadings(
   locationId: string,
+  init?: { signal?: AbortSignal },
 ): Promise<{ latest: ReadingRow | null; previous: ReadingRow | null }> {
   const { url, anonKey } = getSupabaseConfig();
   const endpoint = new URL(`${url}/rest/v1/readings`);
@@ -31,6 +32,7 @@ export async function fetchLatestReadings(
       Authorization: `Bearer ${anonKey}`,
     },
     cache: "no-store",
+    signal: init?.signal,
   });
 
   if (!res.ok) {
