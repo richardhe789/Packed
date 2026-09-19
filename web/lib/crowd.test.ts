@@ -5,6 +5,7 @@ import {
   buildRecommendation,
   emptyState,
   formatReadingAge,
+  liveSourceKind,
   locationFromPlace,
   parsePlaceFields,
   placeFromSensor,
@@ -88,6 +89,20 @@ describe("formatReadingAge", () => {
 
   it("returns null when timestamp is missing", () => {
     expect(formatReadingAge(null, now)).toBeNull();
+  });
+});
+
+describe("liveSourceKind", () => {
+  const now = Date.parse("2020-01-01T00:10:00.000Z");
+
+  it("calls sim rows simulated even if recent", () => {
+    expect(liveSourceKind("sim", "2020-01-01T00:09:50.000Z", now)).toBe("sim");
+  });
+
+  it("calls a fresh esp32 row live and an old one stale", () => {
+    expect(liveSourceKind("esp32", "2020-01-01T00:09:50.000Z", now)).toBe("live");
+    expect(liveSourceKind("esp32", "2019-12-31T23:50:00.000Z", now)).toBe("stale");
+    expect(liveSourceKind(null, null, now)).toBe("none");
   });
 });
 

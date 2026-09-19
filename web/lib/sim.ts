@@ -45,6 +45,23 @@ export function occupancyAt(progress01: number): number {
   return 0.08;
 }
 
+/** One simulated pass through the space (quiet → packed → quiet). */
+export function simHistory(
+  samples = 24,
+  startMs = Date.UTC(2020, 0, 1, 8),
+): HistoryPoint[] {
+  const n = Math.max(2, samples);
+  return Array.from({ length: n }, (_, i) => {
+    const r = fakeReadingAt(i / (n - 1));
+    return {
+      created_at: new Date(startMs + i * 15 * 60 * 1000).toISOString(),
+      density: r.density,
+      packet_count: r.packet_count,
+      avg_rssi: r.avg_rssi,
+    };
+  });
+}
+
 export function fakeReadingAt(progress01: number, noise = 0): FakeReading {
   const occ = occupancyAt(progress01);
   const density = Math.min(100, Math.max(0, Math.round(occ * 100 + noise)));

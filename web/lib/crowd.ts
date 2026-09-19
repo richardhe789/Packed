@@ -15,6 +15,8 @@ export type ReadingState = {
   prevDensity: number | null;
   avgRssi: number | null;
   packetCount: number | null;
+  /** readings.src — `esp32` or `sim`. Omitted in demo. */
+  src?: string | null;
 };
 
 export type CrowdStatus = {
@@ -67,6 +69,22 @@ export const LOCATIONS: LocationDef[] = [locationFromPlace(placeFromSensor())];
 
 export const POLL_MS = 30_000;
 export const REC_GAP = 20;
+/** No new ESP32 row for this long → not live, just the last stored reading. */
+export const STALE_MS = 10 * 60 * 1000;
+
+export type LiveSourceKind = "sim" | "live" | "stale" | "none";
+
+export function liveSourceKind(
+  src: string | null | undefined,
+  createdAt: string | null,
+  nowMs: number,
+): LiveSourceKind {
+  if (!createdAt) return "none";
+  if (src === "sim") return "sim";
+  const then = Date.parse(createdAt);
+  if (Number.isNaN(then) || nowMs - then > STALE_MS) return "stale";
+  return "live";
+}
 
 export function emptyState(): Record<string, ReadingState> {
   const state: Record<string, ReadingState> = {};

@@ -4,6 +4,7 @@ import {
   fakeReadingAt,
   modelFromReadings,
   occupancyAt,
+  simHistory,
 } from "@/lib/sim";
 
 describe("occupancyAt", () => {
@@ -14,6 +15,15 @@ describe("occupancyAt", () => {
     expect(start).toBeLessThan(0.2);
     expect(peak).toBeGreaterThan(0.75);
     expect(end).toBeLessThan(0.2);
+  });
+});
+
+describe("simHistory", () => {
+  it("rises from quiet toward packed mid-window", () => {
+    const rows = simHistory(24);
+    const mid = rows[Math.floor(rows.length * 0.45)];
+    expect(rows[0].density).toBeLessThan(mid.density);
+    expect(mid.density).toBeGreaterThan(70);
   });
 });
 
