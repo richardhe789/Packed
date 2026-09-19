@@ -39,6 +39,18 @@ static const unsigned long WINDOW_MS = 30UL * 1000UL;  // 30s for bench testing
 
 static const char *LOCATION = LOCATION_ID;
 
+static bool hasPlaceholder(const char *value) {
+  return value == nullptr || value[0] == '\0' || String(value).indexOf("YOUR_") >= 0;
+}
+
+static bool hasUsableConfig() {
+  const String url(SUPABASE_URL);
+  return !hasPlaceholder(WIFI_SSID) && !hasPlaceholder(WIFI_PASSWORD) &&
+         !hasPlaceholder(SUPABASE_API_KEY) &&
+         url.startsWith("https://") && url.endsWith(".supabase.co") &&
+         url.indexOf("supabase.com/dashboard") < 0;
+}
+
 // --- Window accumulators (updated from promiscuous callback) ---
 static portMUX_TYPE sniffMux = portMUX_INITIALIZER_UNLOCKED;
 static volatile int64_t rssiSum = 0;
@@ -266,6 +278,14 @@ void setup() {
   Serial.println();
   Serial.println(F("=== WiFi Ambient Crowd Density Sensor ==="));
   Serial.println(F("No MAC tracking. Aggregate RSSI + packet count only."));
+
+  if (!hasUsableConfig()) {
+    Serial.println(F("[fatal] Invalid local config.h. Set hotspot credentials, the"));
+    Serial.println(F("        https://<project-ref>.supabase.co URL, and anon key."));
+    while (true) {
+      delay(5000);
+    }
+  }
 
   if (!connectHotspot()) {
     Serial.println(F("[fatal] Hotspot connect failed. Fix credentials in config.h and reset."));
