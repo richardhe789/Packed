@@ -107,7 +107,7 @@ Open [http://localhost:3000](http://localhost:3000). Demo is the default. Use th
 firmware/include/config.h.example  →  firmware/include/config.h
 ```
 
-Fill `WIFI_SSID` / `WIFI_PASSWORD` (phone hotspot), `SUPABASE_URL` / `SUPABASE_API_KEY` (anon key), optional `LOCATION_ID` (default `dining_hall_main`). Build and upload with [PlatformIO](https://platformio.org/). Serial at **115200**.
+Fill `WIFI_SSID` / `WIFI_PASSWORD` (phone hotspot), `SUPABASE_URL` / `SUPABASE_API_KEY` (anon key), `DEVICE_INGEST_KEY` (must match the Edge Function secret), optional `LOCATION_ID` / `INGEST_PATH`. Build and upload with [PlatformIO](https://platformio.org/). Serial at **115200**.
 
 That is the path: **copy env → run the map**, or **copy `config.h` → flash the sensor**.
 
@@ -159,8 +159,9 @@ Ambient WiFi frames
 
 1. Install PlatformIO (VS Code / Cursor extension is fine).
 2. Copy `config.h.example` → `config.h` (gitignored).
-3. Open `firmware/`, build & upload.
-4. Serial Monitor at **115200**.
+3. Fill in hotspot WiFi, `SUPABASE_URL` / anon `SUPABASE_API_KEY`, and `DEVICE_INGEST_KEY` (must match the `ingest-reading` Edge Function secret). Optional: `LOCATION_ID`, `INGEST_PATH`.
+4. Open `firmware/`, build & upload.
+5. Serial Monitor at **115200**.
 
 ### What you should see
 
@@ -206,16 +207,22 @@ Table `public.readings`:
 | `density` | int 0–100 |
 | `location` | text |
 
-RLS for the hackathon demo: anon can `SELECT` and `INSERT`.
+RLS: anon can **`SELECT`** only (Live dashboard). **Inserts** go through the `ingest-reading` Edge Function (`supabase/functions/ingest-reading/`), which checks `x-device-key` against the `DEVICE_INGEST_KEY` secret and writes with the service role.
 
-Smoke test:
+Smoke tests (replace env vars locally — do not commit values):
 
 ```bash
-curl -X POST "https://YOUR_PROJECT.supabase.co/rest/v1/readings" \
-  -H "apikey: YOUR_ANON_KEY" \
-  -H "Authorization: Bearer YOUR_ANON_KEY" \
+# Live read path (anon) — should return 200
+curl "https://myjfbuathehfghagbnot.supabase.co/rest/v1/readings?select=density,location&limit=1" \
+  -H "apikey: $ANON_KEY" \
+  -H "Authorization: Bearer $ANON_KEY"
+
+# Device ingest — should return 200 and insert a row
+curl -X POST "https://myjfbuathehfghagbnot.supabase.co/functions/v1/ingest-reading" \
+  -H "apikey: $ANON_KEY" \
+  -H "Authorization: Bearer $ANON_KEY" \
   -H "Content-Type: application/json" \
-  -H "Prefer: return=representation" \
+  -H "x-device-key: $DEVICE_INGEST_KEY" \
   -d "{\"avg_rssi\":-60,\"packet_count\":100,\"density\":50,\"location\":\"dining_hall_main\"}"
 ```
 
