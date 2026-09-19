@@ -65,10 +65,10 @@ export default function DetailPanel({
         <motion.aside
           key={loc.id}
           className="detail-panel"
-          initial={reduceMotion ? false : { x: 28, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={reduceMotion ? undefined : { x: 20, opacity: 0 }}
-          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduceMotion ? undefined : { opacity: 0, y: 6 }}
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           aria-label={`${loc.label} details`}
         >
           <div className="detail-panel-inner">

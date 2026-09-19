@@ -25,3 +25,10 @@
 
 // Location is intentionally not configured here. Edit ../../location.config.json
 // (ID, label, latitude, longitude) before building; PlatformIO generates LOCATION_ID.
+
+#ifndef DEVICE_INGEST_KEY
+#define DEVICE_INGEST_KEY "YOUR_DEVICE_INGEST_KEY"
+#endif
+#ifndef INGEST_PATH
+#define INGEST_PATH "/functions/v1/ingest-reading"
+#endif

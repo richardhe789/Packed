@@ -1,0 +1,11 @@
+{
+  "scanned": "2026-09-19",
+  "framework": "Next.js 15 (app router)",
+  "fonts": "Fira Sans + Fira Code (next/font/google, layout.tsx)",
+  "palette": "hex CSS custom properties in web/app/globals.css (:root) — slate dark + green accent",
+  "motion": "framer-motion 13 (package.json)",
+  "spacing": "CSS --space-1..8 (0.25rem steps ≈ 4pt)",
+  "design_md": false,
+  "preserve": ["font stack", "palette tokens (names)", "spacing scale", "map-shell IA", "routes"],
+  "introduce": ["anti-slop visual structure", "OKLCH token discipline", "microinteraction / state polish", "slop-test gates"]
+}

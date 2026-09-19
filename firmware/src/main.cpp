@@ -48,6 +48,7 @@ static bool hasUsableConfig() {
   const String url(SUPABASE_URL);
   return !hasPlaceholder(WIFI_SSID) && !hasPlaceholder(WIFI_PASSWORD) &&
          !hasPlaceholder(SUPABASE_API_KEY) &&
+         !hasPlaceholder(DEVICE_INGEST_KEY) &&
          url.startsWith("https://") && url.endsWith(".supabase.co") &&
          url.indexOf("supabase.com/dashboard") < 0;
 }
@@ -188,7 +189,7 @@ static bool pushReadingToSupabase(float avgRssi, uint32_t packets, int dens) {
     return false;
   }
 
-  String url = String(SUPABASE_URL) + "/rest/v1/readings";
+  String url = String(SUPABASE_URL) + INGEST_PATH;
   WiFiClientSecure client;
   client.setInsecure();  // hackathon: skip cert pinning
 
@@ -201,6 +202,7 @@ static bool pushReadingToSupabase(float avgRssi, uint32_t packets, int dens) {
   http.addHeader("Content-Type", "application/json");
   http.addHeader("apikey", SUPABASE_API_KEY);
   http.addHeader("Authorization", String("Bearer ") + SUPABASE_API_KEY);
+  http.addHeader("x-device-key", DEVICE_INGEST_KEY);
   http.addHeader("Prefer", "return=minimal");
   http.setTimeout(15000);
 

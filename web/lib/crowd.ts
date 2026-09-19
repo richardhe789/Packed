@@ -165,6 +165,18 @@ export function buildRecommendation(
     };
   }
 
+  if (scored.length === 1) {
+    const only = scored[0];
+    const status = statusFromDensity(only.density).label;
+    return {
+      text: `${only.loc.shortLabel} is ${status}`,
+      detail: demoMode
+        ? "Scrub another building in the panel to compare."
+        : "Only one live sensor is online — can’t compare across campus yet.",
+      tone: "neutral",
+    };
+  }
+
   let quietest = scored[0];
   let busiest = scored[0];
   for (const s of scored) {

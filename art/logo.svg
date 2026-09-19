@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Packed logo placeholder">
+  <rect width="128" height="128" rx="28" fill="#1a1a1a"/>
+  <rect x="28" y="36" width="72" height="56" rx="8" fill="none" stroke="#f4f4f5" stroke-width="6"/>
+  <rect x="40" y="52" width="12" height="28" rx="2" fill="#a3a3a3"/>
+  <rect x="58" y="44" width="12" height="36" rx="2" fill="#d4d4d4"/>
+  <rect x="76" y="60" width="12" height="20" rx="2" fill="#737373"/>
+</svg>

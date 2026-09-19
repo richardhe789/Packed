@@ -25,13 +25,6 @@ type Props = {
 
 type PinScreen = { id: string; x: number; y: number };
 
-function pinFill(statusKey: string): string {
-  if (statusKey === "quiet") return "#22c55e";
-  if (statusKey === "moderate") return "#eab308";
-  if (statusKey === "busy") return "#ef4444";
-  return "#94a3b8";
-}
-
 const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 // Next/Turbopack breaks MapLibre's bundled worker → blank basemap, pins still work.
@@ -176,11 +169,10 @@ export default function CampusMap({
             <button
               key={loc.id}
               type="button"
-              className={`geo-pin${selected ? " is-selected" : ""}${best ? " is-best" : ""}${pulse ? " is-live" : ""}`}
+              className={`geo-pin status-${crowd.key}${selected ? " is-selected" : ""}${best ? " is-best" : ""}${pulse ? " is-live" : ""}`}
               style={{
                 left: pin.x,
                 top: pin.y,
-                ["--pin-color" as string]: pinFill(crowd.key),
               }}
               aria-label={`${loc.label}, ${crowd.label}`}
               onClick={() => onSelect(loc.id)}

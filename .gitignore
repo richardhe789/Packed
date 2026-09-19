@@ -11,6 +11,7 @@ web/out/
 .vscode/ipch
 firmware/include/config.h
 firmware/include/location_config.generated.h
+firmware/compile_commands.json
 .env
 .env.*
 !.env.example
