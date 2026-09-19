@@ -1,0 +1,27 @@
+// Copy this file to config.h and fill in real values.
+// config.h is gitignored — do not commit secrets.
+
+#pragma once
+
+// Phone hotspot credentials (demo uplink — not campus WiFi)
+#ifndef WIFI_SSID
+#define WIFI_SSID "YOUR_HOTSPOT_SSID"
+#endif
+
+#ifndef WIFI_PASSWORD
+#define WIFI_PASSWORD "YOUR_HOTSPOT_PASSWORD"
+#endif
+
+// Supabase project URL, e.g. https://xxxx.supabase.co
+#ifndef SUPABASE_URL
+#define SUPABASE_URL "https://YOUR_PROJECT.supabase.co"
+#endif
+
+// Prefer anon key + RLS insert policy for demo
+#ifndef SUPABASE_API_KEY
+#define SUPABASE_API_KEY "YOUR_SUPABASE_ANON_KEY"
+#endif
+
+#ifndef LOCATION_ID
+#define LOCATION_ID "dining_hall_main"
+#endif
