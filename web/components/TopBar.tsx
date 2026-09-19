@@ -2,22 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Radio, Sun } from "lucide-react";
-import type { Recommendation } from "@/lib/crowd";
 import { applyTheme, resolveTheme, toggleTheme, type Theme } from "@/lib/theme";
 
 type Props = {
   demoMode: boolean;
-  recommendation: Recommendation;
   onDemo: () => void;
   onLive: () => void;
 };
 
-export default function TopBar({
-  demoMode,
-  recommendation,
-  onDemo,
-  onLive,
-}: Props) {
+export default function TopBar({ demoMode, onDemo, onLive }: Props) {
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
@@ -36,31 +29,30 @@ export default function TopBar({
           rel="noreferrer"
           title="Virginia Tech"
         >
-          {/* Demo lockup using VT brand colors. Official assets: brand.vt.edu */}
+          {/* Wikimedia Commons vector of the athletic VT. Official files: brand.vt.edu (license required). */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/vt-logo.svg"
             alt="Virginia Tech"
             className="vt-logo"
-            width={120}
-            height={56}
+            width={140}
+            height={64}
           />
         </a>
-        <div className="brand-divider" aria-hidden />
-        <div className="brand-lockup-text">
-          <span className={`live-dot${!demoMode ? " on" : ""}`} aria-hidden />
-          <div className="brand-text-stack">
-            <p className="brand">Packed</p>
-            <p className="brand-sub">Virginia Tech · Blacksburg</p>
-            <p
-              className={`brand-tip tone-${recommendation.tone}`}
-              title={recommendation.detail}
-            >
-              {recommendation.text}
-            </p>
-          </div>
-        </div>
+        <span className="brand-x" aria-hidden>
+          x
+        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/packed-logo.png"
+          alt="Packed"
+          className="packed-logo"
+          width={64}
+          height={64}
+        />
       </div>
+
+      <h1 className="map-topbar-title">PACKED</h1>
 
       <div className="topbar-actions">
         <button

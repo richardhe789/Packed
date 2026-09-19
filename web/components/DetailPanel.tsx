@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Activity,
@@ -12,15 +13,17 @@ import {
   X,
 } from "lucide-react";
 import {
-  getLocation,
+  formatReadingAge,
   statusFromDensity,
   trendDirection,
   type LocationDef,
+  type PlaceFields,
   type ReadingState,
   type Recommendation,
 } from "@/lib/crowd";
 
 type Props = {
+  location: LocationDef;
   selectedId: string | null;
   state: Record<string, ReadingState>;
   recommendation: Recommendation;
@@ -30,6 +33,7 @@ type Props = {
   liveLoading: boolean;
   onClose: () => void;
   onSlider: (id: string, value: number) => void;
+  onPlaceChange: (place: PlaceFields) => void;
 };
 
 function TrendGlyph({
@@ -45,6 +49,7 @@ function TrendGlyph({
 }
 
 export default function DetailPanel({
+  location: loc,
   selectedId,
   state,
   recommendation,
@@ -54,10 +59,10 @@ export default function DetailPanel({
   liveLoading,
   onClose,
   onSlider,
+  onPlaceChange,
 }: Props) {
   const reduceMotion = useReducedMotion();
-  const loc = selectedId ? getLocation(selectedId) : undefined;
-  const reading = selectedId ? state[selectedId] : undefined;
+  const reading = selectedId === loc.id ? state[loc.id] : undefined;
 
   return (
     <AnimatePresence mode="wait">
@@ -102,7 +107,7 @@ export default function DetailPanel({
               ) : null}
             </div>
 
-            <DensityBlock loc={loc} reading={reading} />
+            <DensityBlock loc={loc} reading={reading} demoMode={demoMode} />
 
             <section
               className={`recommendation compact tone-${recommendation.tone}`}
@@ -153,6 +158,76 @@ export default function DetailPanel({
               </div>
             ) : null}
 
+            <div className="dev-panel embedded">
+              <h3>Pin location</h3>
+              <p className="dev-hint">
+                Place name and Google Maps coordinates. The ESP32 still posts
+                under the id in location.config.json.
+              </p>
+              <label className="place-field">
+                <span>Place name</span>
+                <input
+                  type="text"
+                  value={loc.label}
+                  autoComplete="off"
+                  onChange={(e) =>
+                    onPlaceChange({
+                      id: loc.id,
+                      label: e.target.value,
+                      latitude: loc.coords.lat,
+                      longitude: loc.coords.lng,
+                    })
+                  }
+                />
+              </label>
+              <label className="place-field">
+                <span>Latitude</span>
+                <input
+                  type="number"
+                  step="0.00001"
+                  min={-90}
+                  max={90}
+                  value={loc.coords.lat}
+                  onChange={(e) => {
+                    const latitude = Number(e.target.value);
+                    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)
+                      return;
+                    onPlaceChange({
+                      id: loc.id,
+                      label: loc.label,
+                      latitude,
+                      longitude: loc.coords.lng,
+                    });
+                  }}
+                />
+              </label>
+              <label className="place-field">
+                <span>Longitude</span>
+                <input
+                  type="number"
+                  step="0.00001"
+                  min={-180}
+                  max={180}
+                  value={loc.coords.lng}
+                  onChange={(e) => {
+                    const longitude = Number(e.target.value);
+                    if (
+                      !Number.isFinite(longitude) ||
+                      longitude < -180 ||
+                      longitude > 180
+                    )
+                      return;
+                    onPlaceChange({
+                      id: loc.id,
+                      label: loc.label,
+                      latitude: loc.coords.lat,
+                      longitude,
+                    });
+                  }}
+                />
+              </label>
+            </div>
+
             <p className="privacy-note">
               Ambient WiFi activity only — no device tracking, no headcount.
             </p>
@@ -166,17 +241,33 @@ export default function DetailPanel({
 function DensityBlock({
   loc,
   reading,
+  demoMode,
 }: {
   loc: LocationDef;
   reading: ReadingState;
+  demoMode: boolean;
 }) {
   const status = statusFromDensity(reading.density);
   const trend = trendDirection(reading.density, reading.prevDensity);
   const hasData = reading.density != null;
   const dens = reading.density ?? 0;
-  const when = reading.created_at
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (demoMode || !reading.created_at) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [demoMode, reading.created_at]);
+
+  const age = !demoMode ? formatReadingAge(reading.created_at, nowMs) : null;
+  const clock = reading.created_at
     ? new Date(reading.created_at).toLocaleTimeString()
     : "";
+  const when = age ?? (clock ? clock : "");
+  const showTelemetry =
+    !demoMode &&
+    loc.liveSensor &&
+    (reading.avgRssi != null || reading.packetCount != null);
 
   return (
     <div className="density-block">
@@ -198,6 +289,17 @@ function DensityBlock({
         {hasData ? `${dens}/100` : loc.liveSensor ? "awaiting sensor" : "no data"}
         {when ? ` · ${when}` : ""}
       </p>
+      {showTelemetry ? (
+        <p className="sub telemetry">
+          {reading.avgRssi != null
+            ? `RSSI ${reading.avgRssi.toFixed(1)} dBm`
+            : "RSSI —"}
+          {" · "}
+          {reading.packetCount != null
+            ? `${reading.packetCount} packets`
+            : "no packets"}
+        </p>
+      ) : null}
       <div className="density-bar" aria-hidden="true">
         <div
           className={`density-fill ${status.key}`}
