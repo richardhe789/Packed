@@ -50,3 +50,35 @@ export async function fetchLatestReadings(
     previous: rows[1] ?? null,
   };
 }
+
+export async function fetchReadingHistory(
+  locationId: string,
+  limit = 800,
+  init?: { signal?: AbortSignal },
+): Promise<ReadingRow[]> {
+  const { url, anonKey } = getSupabaseConfig();
+  const endpoint = new URL(`${url}/rest/v1/sim_readings`);
+  endpoint.searchParams.set(
+    "select",
+    "density,created_at,location,avg_rssi,packet_count",
+  );
+  endpoint.searchParams.set("location", `eq.${locationId}`);
+  endpoint.searchParams.set("order", "created_at.desc");
+  endpoint.searchParams.set("limit", String(limit));
+
+  const res = await fetch(endpoint.toString(), {
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+    },
+    cache: "no-store",
+    signal: init?.signal,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+  }
+
+  const rows = (await res.json()) as ReadingRow[];
+  return rows.slice().reverse();
+}
