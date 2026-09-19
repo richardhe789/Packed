@@ -1,3 +1,5 @@
+import { SENSOR_LOCATION } from "@/lib/location.generated";
+
 export type LocationDef = {
   id: string;
   label: string;
@@ -11,6 +13,10 @@ export type ReadingState = {
   density: number | null;
   created_at: string | null;
   prevDensity: number | null;
+  avgRssi: number | null;
+  packetCount: number | null;
+  /** readings.src — `esp32` or `sim`. Omitted in demo. */
+  src?: string | null;
 };
 
 export type CrowdStatus = {
@@ -24,87 +30,87 @@ export type Recommendation = {
   tone: "go" | "neutral";
 };
 
-/** Temporary focus: Virginia Tech, Blacksburg (approx building centers). */
+/** Map camera follows the one configured sensor pin. */
 export const CAMPUS_VIEW = {
-  longitude: -80.422,
-  latitude: 37.2278,
-  zoom: 15.35,
+  longitude: SENSOR_LOCATION.longitude,
+  latitude: SENSOR_LOCATION.latitude,
+  zoom: 16.6,
 } as const;
 
-export const LOCATIONS: LocationDef[] = [
-  {
+export type PlaceFields = {
+  id: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+};
+
+export function placeFromSensor(): PlaceFields {
+  return {
     id: SENSOR_LOCATION.id,
     label: SENSOR_LOCATION.label,
-    shortLabel: SENSOR_LOCATION.label,
+    latitude: SENSOR_LOCATION.latitude,
+    longitude: SENSOR_LOCATION.longitude,
+  };
+}
+
+export function locationFromPlace(place: PlaceFields): LocationDef {
+  const label = place.label.trim() || SENSOR_LOCATION.label;
+  return {
+    id: SENSOR_LOCATION.id,
+    label,
+    shortLabel: label,
     liveSensor: true,
-    // Manual Google Maps coordinate from the shared location configuration.
-    coords: { lat: SENSOR_LOCATION.latitude, lng: SENSOR_LOCATION.longitude },
-  },
-  {
-    id: "dining_hall_west",
-    label: "West End Market",
-    shortLabel: "West End",
-    liveSensor: false,
-    coords: { lat: 37.2219, lng: -80.4243 },
-  },
-  {
-    id: "library_lobby",
-    label: "Newman Library",
-    shortLabel: "Newman",
-    liveSensor: false,
-    coords: { lat: 37.22905, lng: -80.41935 },
-  },
-  {
-    id: "student_union",
-    label: "Squires Student Center",
-    shortLabel: "Squires",
-    liveSensor: false,
-    coords: { lat: 37.22955, lng: -80.41795 },
-  },
-  {
-    id: "rec_center",
-    label: "McComas Hall",
-    shortLabel: "McComas",
-    liveSensor: false,
-    coords: { lat: 37.2214, lng: -80.41875 },
-  },
-  {
-    id: "science_quad",
-    label: "Derring Hall",
-    shortLabel: "Derring",
-    liveSensor: false,
-    coords: { lat: 37.23015, lng: -80.4254 },
-  },
-];
+    coords: { lat: place.latitude, lng: place.longitude },
+  };
+}
+
+/** One pin. Name + coordinates come from location.config.json (or the in-app editor). */
+export const LOCATIONS: LocationDef[] = [locationFromPlace(placeFromSensor())];
 
 export const POLL_MS = 30_000;
 export const REC_GAP = 20;
+/** No new ESP32 row for this long → not live, just the last stored reading. */
+export const STALE_MS = 10 * 60 * 1000;
+
+export type LiveSourceKind = "sim" | "live" | "stale" | "none";
+
+export function liveSourceKind(
+  src: string | null | undefined,
+  createdAt: string | null,
+  nowMs: number,
+): LiveSourceKind {
+  if (!createdAt) return "none";
+  if (src === "sim") return "sim";
+  const then = Date.parse(createdAt);
+  if (Number.isNaN(then) || nowMs - then > STALE_MS) return "stale";
+  return "live";
+}
 
 export function emptyState(): Record<string, ReadingState> {
   const state: Record<string, ReadingState> = {};
   for (const loc of LOCATIONS) {
-    state[loc.id] = { density: null, created_at: null, prevDensity: null };
+    state[loc.id] = {
+      density: null,
+      created_at: null,
+      prevDensity: null,
+      avgRssi: null,
+      packetCount: null,
+    };
   }
   return state;
 }
 
 /** Pass `at` only from client code. Omit on SSR so server/client HTML matches. */
 export function seedDemoState(at: string | null = null): Record<string, ReadingState> {
-  const samples: Record<string, number> = {
-    [SENSOR_LOCATION.id]: 78,
-    dining_hall_west: 22,
-    library_lobby: 45,
-    student_union: 62,
-    rec_center: 35,
-    science_quad: 18,
-  };
   const state: Record<string, ReadingState> = {};
   for (const loc of LOCATIONS) {
-    const d = samples[loc.id] ?? 40;
+    const d = 62;
     state[loc.id] = {
       density: d,
       prevDensity: Math.max(0, d - 8),
       created_at: at,
+      avgRssi: null,
+      packetCount: null,
     };
   }
   return state;
@@ -171,7 +177,7 @@ export function buildRecommendation(
     return {
       text: `${only.loc.shortLabel} is ${status}`,
       detail: demoMode
-        ? "Scrub another building in the panel to compare."
+        ? "Scrub density in the panel to try Quiet / Moderate / Busy."
         : "Only one live sensor is online — can’t compare across campus yet.",
       tone: "neutral",
     };
@@ -201,6 +207,20 @@ export function buildRecommendation(
   };
 }
 
+/** Relative age of a reading timestamp for Live “it’s real” copy. */
+export function formatReadingAge(
+  createdAt: string | null,
+  nowMs: number,
+): string | null {
+  if (!createdAt) return null;
+  const then = Date.parse(createdAt);
+  if (Number.isNaN(then)) return null;
+  const sec = Math.max(0, Math.floor((nowMs - then) / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  return `${Math.floor(sec / 3600)}h ago`;
+}
+
 export function wantsDemoFromSearch(search: string): boolean {
   const q = new URLSearchParams(search);
   if (q.get("demo") === "1" || q.get("demo") === "true") return true;
@@ -208,8 +228,27 @@ export function wantsDemoFromSearch(search: string): boolean {
   return true;
 }
 
+export function parsePlaceFields(raw: unknown): PlaceFields | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.id !== "string" || o.id !== SENSOR_LOCATION.id) return null;
+  if (typeof o.label !== "string") return null;
+  if (typeof o.latitude !== "number" || !Number.isFinite(o.latitude)) return null;
+  if (typeof o.longitude !== "number" || !Number.isFinite(o.longitude)) return null;
+  if (o.latitude < -90 || o.latitude > 90) return null;
+  if (o.longitude < -180 || o.longitude > 180) return null;
+  return {
+    id: o.id,
+    label: o.label,
+    latitude: o.latitude,
+    longitude: o.longitude,
+  };
+}
+
+export const PLACE_STORAGE_KEY = "packed-place";
+
 export function getLocation(id: string): LocationDef | undefined {
   return LOCATIONS.find((l) => l.id === id);
 }
-export { SENSOR_LOCATION } from "@/lib/location.generated";
-import { SENSOR_LOCATION } from "@/lib/location.generated";
+
+export { SENSOR_LOCATION };

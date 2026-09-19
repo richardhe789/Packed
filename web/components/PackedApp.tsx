@@ -5,13 +5,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   LOCATIONS,
+  PLACE_STORAGE_KEY,
   POLL_MS,
   SENSOR_LOCATION,
   buildRecommendation,
   emptyState,
+  liveSourceKind,
+  locationFromPlace,
+  parsePlaceFields,
+  placeFromSensor,
   quietestLocationId,
   seedDemoState,
   wantsDemoFromSearch,
+  type PlaceFields,
   type ReadingState,
 } from "@/lib/crowd";
 import { fetchLatestReadings } from "@/lib/supabase";
@@ -37,19 +43,22 @@ export default function PackedApp() {
   const search = searchParams.toString() ? `?${searchParams.toString()}` : "";
 
   const initialDemo = wantsDemoFromSearch(search);
+  const [place, setPlace] = useState<PlaceFields>(placeFromSensor);
+  const liveLoc = useMemo(() => locationFromPlace(place), [place]);
   const [demoMode, setDemoMode] = useState(initialDemo);
   const [state, setState] = useState<Record<string, ReadingState>>(() =>
     initialDemo ? seedDemoState() : emptyState(),
   );
   const [meta, setMeta] = useState(() =>
     initialDemo
-      ? "Demo · tap a building on the VT map · scrub density in the panel"
+      ? "Demo · one sensor pin · scrub density in the panel"
       : "Live · fetching…",
   );
   const [liveLoading, setLiveLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(() =>
-    initialDemo ? "dining_hall_west" : SENSOR_LOCATION.id,
+  const [selectedId, setSelectedId] = useState<string | null>(
+    SENSOR_LOCATION.id,
   );
+  const [sheetExpanded, setSheetExpanded] = useState(false);
 
   const liveGenerationRef = useRef(0);
   const liveAbortRef = useRef<AbortController | null>(null);
@@ -75,8 +84,8 @@ export default function PackedApp() {
     setDemoMode(true);
     setLiveLoading(false);
     setState(seeded);
-    setMeta("Demo · tap a building · scrub density in the panel");
-    setSelectedId(quietestLocationId(seeded) ?? "dining_hall_west");
+    setMeta("Demo · one sensor pin · scrub density in the panel");
+    setSelectedId(SENSOR_LOCATION.id);
     syncUrl(true);
   }, [syncUrl]);
 
@@ -88,6 +97,26 @@ export default function PackedApp() {
     setSelectedId(SENSOR_LOCATION.id);
     syncUrl(false);
   }, [syncUrl]);
+
+  const [placeReady, setPlaceReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(PLACE_STORAGE_KEY);
+      if (raw) {
+        const parsed = parsePlaceFields(JSON.parse(raw) as unknown);
+        if (parsed) setPlace(parsed);
+      }
+    } catch {
+      // Ignore bad localStorage; location.config.json remains the default.
+    }
+    setPlaceReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!placeReady) return;
+    window.localStorage.setItem(PLACE_STORAGE_KEY, JSON.stringify(place));
+  }, [place, placeReady]);
 
   useEffect(() => {
     if (!demoMode) return;
@@ -138,13 +167,30 @@ export default function PackedApp() {
               density: latest ? latest.density : null,
               created_at: latest ? latest.created_at : null,
               prevDensity: previous ? previous.density : null,
+              avgRssi: latest ? latest.avg_rssi : null,
+              packetCount: latest ? latest.packet_count : null,
+              src: latest ? latest.src : null,
             };
           }
           return next;
         });
-        setMeta(
-          `Live · updated ${new Date().toLocaleTimeString()} · every ${POLL_MS / 1000}s`,
+        const latestRow = results[0]?.latest ?? null;
+        const kind = liveSourceKind(
+          latestRow?.src,
+          latestRow?.created_at ?? null,
+          Date.now(),
         );
+        if (kind === "sim") {
+          setMeta("Simulated · sim_readings / src=sim · not a plugged-in ESP32");
+        } else if (kind === "stale") {
+          setMeta(
+            "Last ESP32 row in readings · sensor not posting · dashboard still polls",
+          );
+        } else if (kind === "none") {
+          setMeta("No ESP32 rows in readings yet · polling every 30s");
+        } else {
+          setMeta(`ESP32 posting · dashboard poll every ${POLL_MS / 1000}s`);
+        }
       } catch (err) {
         if (isAbortError(err) || signal.aborted) return;
         if (gen !== liveGenerationRef.current) return;
@@ -159,13 +205,43 @@ export default function PackedApp() {
       }
     };
 
-    void runPoll();
-    const intervalId = window.setInterval(() => {
+    let intervalId: number | null = null;
+
+    function stopInterval() {
+      if (intervalId == null) return;
+      window.clearInterval(intervalId);
+      intervalId = null;
+    }
+
+    function startInterval() {
+      stopInterval();
+      intervalId = window.setInterval(() => {
+        void runPoll();
+      }, POLL_MS);
+    }
+
+    function onVisible() {
       void runPoll();
-    }, POLL_MS);
+      startInterval();
+    }
+
+    function onHidden() {
+      stopInterval();
+      liveAbortRef.current?.abort();
+      liveAbortRef.current = null;
+    }
+
+    function onVisibility() {
+      if (document.visibilityState === "visible") onVisible();
+      else onHidden();
+    }
+
+    if (document.visibilityState === "visible") onVisible();
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+      stopInterval();
       liveAbortRef.current?.abort();
       liveAbortRef.current = null;
     };
@@ -188,37 +264,51 @@ export default function PackedApp() {
         prevDensity: prev[id].density,
         density: value,
         created_at: new Date().toISOString(),
+        avgRssi: prev[id].avgRssi,
+        packetCount: prev[id].packetCount,
+        src: prev[id].src,
       },
     }));
   }
 
   return (
-    <div className="map-shell">
+    <div
+      className="map-shell"
+      data-sheet-expanded={sheetExpanded ? "true" : "false"}
+      data-demo={demoMode ? "true" : "false"}
+    >
       <TopBar
         demoMode={demoMode}
-        recommendation={recommendation}
         onDemo={enterDemo}
         onLive={enterLive}
       />
 
       <div className="map-stage">
         <CampusMap
+          location={liveLoc}
           state={state}
           selectedId={selectedId}
           bestId={bestId}
           demoMode={demoMode}
-          onSelect={setSelectedId}
+          sheetExpanded={sheetExpanded}
+          onSelect={(id) => {
+            setSelectedId(id);
+            setSheetExpanded(true);
+          }}
         />
 
         <DetailPanel
+          location={liveLoc}
           selectedId={selectedId}
           state={state}
-          recommendation={recommendation}
           bestId={bestId}
           demoMode={demoMode}
+          sheetExpanded={sheetExpanded}
           meta={meta}
           liveLoading={liveLoading}
           onClose={() => setSelectedId(null)}
+          onCollapse={() => setSheetExpanded(false)}
+          onExpand={() => setSheetExpanded(true)}
           onSlider={onSlider}
         />
       </div>

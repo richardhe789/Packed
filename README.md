@@ -1,7 +1,5 @@
-![Packed — skip the packed line](./art/banner.svg)
-
 <p align="center">
-  <img src="./art/logo.svg" width="72" height="72" alt="Packed logo placeholder">
+  <img src="./art/packed-logo.png" width="160" height="160" alt="Packed">
 </p>
 
 <p align="center">
@@ -31,12 +29,11 @@
 
 If you want **“how busy is this dining hall right now?”** without cameras, without tracking phones, and without a campus IT integration — use Packed.
 
-> **Status:** hackathon MVP. Single live sensor at Dietrick Hall (Virginia Tech). Demo mode seeds the rest of the map.
+> **Status:** hackathon MVP. Single live sensor at Goodwin Hall (Virginia Tech). Demo mode seeds that pin.
 
 ## Table of contents
 
 - [Why Packed](#why-packed)
-- [Screenshots](#screenshots)
 - [Features](#features)
 - [Quick start](#quick-start)
 - [Usage](#usage)
@@ -63,24 +60,10 @@ If you want **“how busy is this dining hall right now?”** without cameras, w
 
 **Building a pitch?** See [`PRESENTATION.md`](PRESENTATION.md). **After the hackathon?** See [`NEXT_STEPS.md`](NEXT_STEPS.md).
 
-## Screenshots
-
-![Campus map](./art/gallery-map.svg)
-
-![Campus map in dark mode](./art/gallery-map-dark.svg)
-
-![Location detail panel](./art/gallery-panel.svg)
-
-![Live mode](./art/gallery-live.svg)
-
-![Firmware serial window](./art/gallery-firmware.svg)
-
-*Art in `art/` is temporary placeholder SVG. Swap in real captures when you have them.*
-
 ## Features
 
 - **Aggregates only** — firmware never extracts or stores MAC addresses
-- **On-device density** — 5-minute windows (or 30s short env), 0–100 accumulator
+- **On-device density** — 30s short windows by default for demos (5 min via `esp32dev`), 0–100 accumulator
 - **Hotspot uplink** — ESP32 STA on a phone AP, not campus WiFi
 - **Supabase `readings`** — RSSI, packet count, density, location
 - **Next.js dashboard** — MapLibre campus map, Demo / Live toggle
@@ -107,7 +90,7 @@ Open [http://localhost:3000](http://localhost:3000). Demo is the default. Use th
 firmware/include/config.h.example  →  firmware/include/config.h
 ```
 
-Fill `WIFI_SSID` / `WIFI_PASSWORD` (phone hotspot), `SUPABASE_URL` / `SUPABASE_API_KEY` (anon key), and `DEVICE_INGEST_KEY` (must match the Edge Function secret). Configure the manual location only in root [`location.config.json`](location.config.json): ID, label, latitude, and longitude. Build and upload with [PlatformIO](https://platformio.org/). Serial at **115200**.
+Fill `WIFI_SSID` / `WIFI_PASSWORD` (phone hotspot), `SUPABASE_URL` / `SUPABASE_API_KEY` (anon key), and `DEVICE_INGEST_KEY` (must match the Edge Function secret). Configure the manual location only in root [`location.config.json`](location.config.json): ID, label, latitude, and longitude. Build and upload with [PlatformIO](https://platformio.org/) — default env is `esp32dev_short` (~30s windows for judging). Serial at **115200**.
 
 That is the path: **copy env → run the map**, or **copy `config.h` → flash the sensor**.
 
@@ -124,7 +107,7 @@ That is the path: **copy env → run the map**, or **copy `config.h` → flash t
 ### Demo vs Live
 
 - **Demo** — seeded crowd levels and sliders. No ESP32 required. Best for the multi-building “go here, not there” story.
-- **Live** — polls Supabase for the ID in `location.config.json` about every 30s. Honest story today: how packed is the configured sensor location.
+- **Live** — polls Supabase for the ID in `location.config.json` about every 30s. Honest story today: how packed is **this room** (one ESP32). Other map pins are Preview, not live sensors.
 
 ### Venue loop
 
@@ -153,7 +136,7 @@ Ambient WiFi frames
 | `web/.env.example` | Next.js Supabase env template |
 | [`location.config.json`](location.config.json) | The one manual ESP32/dashboard testing location |
 | [`LOCATION.md`](LOCATION.md) | Move-the-sensor instructions |
-| `art/` | README banner / gallery placeholders |
+| `art/packed-logo.png` | Product logo |
 | [`NEXT_STEPS.md`](NEXT_STEPS.md) | Post-hackathon roadmap |
 | [`PRESENTATION.md`](PRESENTATION.md) | Judge demo script |
 
@@ -187,9 +170,7 @@ PlatformIO may regenerate `compile_commands.json` locally; it is gitignored.
 | `RSSI_THRESHOLD` | 10 | % RSSI drop required |
 | `PACKET_THRESHOLD` | 15 | % packet-count rise required |
 | `STEP_UP` / `STEP_DOWN` | 10 / 5 | Density accumulator steps |
-| `WINDOW_MS` | 5 min | Averaging window |
-
-Faster bench: PlatformIO env `esp32dev_short` (30s windows).
+| `WINDOW_MS` | 30s (`esp32dev_short`, default) / 5 min (`esp32dev`) | Averaging window |
 
 ### Radio notes
 
@@ -210,9 +191,15 @@ Table `public.readings`:
 | `packet_count` | int |
 | `density` | int 0–100 |
 | `location` | text |
+| `src` | text (`esp32` on `readings`, `sim` on `sim_readings`) |
+
+Fake movement lives in a separate table, `public.sim_readings` (same columns, no ESP32 rows). Open **Table Editor → `sim_readings`**. Re-seed with [`supabase/sim_readings.sql`](supabase/sim_readings.sql). Remove later with:
+
+```sql
+delete from public.sim_readings;
+```
 
 RLS: anon can **`SELECT`** only (Live dashboard). **Inserts** go through the `ingest-reading` Edge Function (`supabase/functions/ingest-reading/`), which checks `x-device-key` against the `DEVICE_INGEST_KEY` secret and writes with the service role.
-
 Smoke tests (replace env vars locally — do not commit values):
 
 ```bash
@@ -227,7 +214,7 @@ curl -X POST "https://myjfbuathehfghagbnot.supabase.co/functions/v1/ingest-readi
   -H "Authorization: Bearer $ANON_KEY" \
   -H "Content-Type: application/json" \
   -H "x-device-key: $DEVICE_INGEST_KEY" \
--d "{\"avg_rssi\":-60,\"packet_count\":100,\"density\":50,\"location\":\"dining_hall_main\"}"
+-d "{\"avg_rssi\":-60,\"packet_count\":100,\"density\":50,\"location\":\"goodwin_hall\"}"
 ```
 
 The firmware and dashboard use the same ID from `location.config.json`; the live marker also uses its label and manual coordinates. No GPS or automatic location detection is used.

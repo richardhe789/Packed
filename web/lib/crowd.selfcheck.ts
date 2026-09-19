@@ -3,8 +3,11 @@
  * Run from web/: npx --yes tsx lib/crowd.selfcheck.ts
  */
 import {
+  SENSOR_LOCATION,
   buildRecommendation,
   emptyState,
+  locationFromPlace,
+  placeFromSensor,
   seedDemoState,
   type ReadingState,
 } from "./crowd";
@@ -14,17 +17,20 @@ function assert(cond: unknown, msg: string): asserts cond {
 }
 
 const liveOne: Record<string, ReadingState> = emptyState();
-liveOne.dining_hall_main = {
+liveOne[SENSOR_LOCATION.id] = {
   density: 80,
   created_at: "2020-01-01T00:00:00.000Z",
   prevDensity: 70,
+  avgRssi: null,
+  packetCount: null,
 };
 
 const liveRec = buildRecommendation(liveOne, false);
+const pin = locationFromPlace(placeFromSensor());
 assert(liveRec.tone === "neutral", "single live sensor ? neutral");
 assert(
-  liveRec.text === "Dietrick is Busy",
-  `expected Dietrick is Busy, got ${liveRec.text}`,
+  liveRec.text === `${pin.shortLabel} is Busy`,
+  `expected ${pin.shortLabel} is Busy, got ${liveRec.text}`,
 );
 assert(
   !liveRec.text.includes("Anywhere looks similar"),
@@ -33,7 +39,10 @@ assert(
 
 const demo = seedDemoState("2020-01-01T00:00:00.000Z");
 const demoRec = buildRecommendation(demo, true);
-assert(demoRec.tone === "go", "seeded demo with gap ? go");
-assert(demoRec.text.startsWith("Go to "), `expected Go to…, got ${demoRec.text}`);
+assert(demoRec.tone === "neutral", "one seeded pin ? single-sensor copy");
+assert(
+  demoRec.text === `${pin.shortLabel} is Moderate`,
+  `expected ${pin.shortLabel} is Moderate, got ${demoRec.text}`,
+);
 
 console.log("crowd.selfcheck: ok");

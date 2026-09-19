@@ -10,16 +10,19 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   CAMPUS_VIEW,
-  LOCATIONS,
+  liveSourceKind,
   statusFromDensity,
+  type LocationDef,
   type ReadingState,
 } from "@/lib/crowd";
 
 type Props = {
+  location: LocationDef;
   state: Record<string, ReadingState>;
   selectedId: string | null;
   bestId: string | null;
   demoMode: boolean;
+  sheetExpanded: boolean;
   onSelect: (id: string) => void;
 };
 
@@ -36,11 +39,24 @@ function ensureMapLibreWorker() {
   workerConfigured = true;
 }
 
+function mapBottomPad(expanded: boolean, demoMode: boolean) {
+  if (typeof window === "undefined") return 0;
+  if (!window.matchMedia("(max-width: 51.1875rem)").matches) return 0;
+  if (expanded) {
+    return demoMode
+      ? Math.min(window.innerHeight * 0.7, 560)
+      : Math.min(window.innerHeight * 0.42, 280);
+  }
+  return 168;
+}
+
 export default function CampusMap({
+  location,
   state,
   selectedId,
   bestId,
   demoMode,
+  sheetExpanded,
   onSelect,
 }: Props) {
   const reduceMotion = useReducedMotion();
@@ -49,7 +65,9 @@ export default function CampusMap({
 
   const [mapEpoch, setMapEpoch] = useState(0);
   const [pins, setPins] = useState<PinScreen[]>([]);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Imperative MapLibre — style URL (OpenFreeMap). Sync create avoids Strict Mode async races.
@@ -65,13 +83,16 @@ export default function CampusMap({
     const map = new MapLibreMap({
       container: el,
       style: OPENFREEMAP_STYLE_URL,
-      center: [CAMPUS_VIEW.longitude, CAMPUS_VIEW.latitude],
+      center: [location.coords.lng, location.coords.lat],
       zoom: CAMPUS_VIEW.zoom,
       attributionControl: { compact: true },
     });
 
     mapRef.current = map;
-    map.addControl(new NavigationControl({ showCompass: false }), "bottom-left");
+    map.addControl(
+      new NavigationControl({ showCompass: false }),
+      "bottom-left",
+    );
 
     const resize = () => {
       if (!cancelled) map.resize();
@@ -132,10 +153,8 @@ export default function CampusMap({
 
     const project = () => {
       const next: PinScreen[] = [];
-      for (const loc of LOCATIONS) {
-        const p = map.project([loc.coords.lng, loc.coords.lat]);
-        next.push({ id: loc.id, x: p.x, y: p.y });
-      }
+      const p = map.project([location.coords.lng, location.coords.lat]);
+      next.push({ id: location.id, x: p.x, y: p.y });
       setPins(next);
     };
 
@@ -149,21 +168,50 @@ export default function CampusMap({
       map.off("zoom", project);
       map.off("resize", project);
     };
-  }, [mapEpoch]);
+  }, [mapEpoch, location.coords.lat, location.coords.lng, location.id]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapEpoch === 0) return;
+    map.flyTo({
+      center: [location.coords.lng, location.coords.lat],
+      duration: 450,
+    });
+  }, [mapEpoch, location.coords.lat, location.coords.lng]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapEpoch === 0) return;
+    const apply = () => {
+      map.setPadding({
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: mapBottomPad(sheetExpanded, demoMode),
+      });
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, [mapEpoch, sheetExpanded, demoMode]);
 
   return (
     <div className="map-canvas">
       <div ref={containerRef} className="map-container" />
 
-      <div className="map-pins" aria-label="Campus buildings">
+      <div className="map-pins" aria-label="Sensor location">
         {pins.map((pin) => {
-          const loc = LOCATIONS.find((l) => l.id === pin.id);
+          const loc = pin.id === location.id ? location : null;
           if (!loc) return null;
           const reading = state[loc.id];
           const crowd = statusFromDensity(reading?.density ?? null);
           const selected = loc.id === selectedId;
           const best = loc.id === bestId;
-          const pulse = !demoMode && loc.liveSensor && !reduceMotion;
+          const pulse =
+            !demoMode &&
+            liveSourceKind(reading?.src, reading?.created_at ?? null, Date.now()) ===
+              "live" &&
+            !reduceMotion;
 
           return (
             <button

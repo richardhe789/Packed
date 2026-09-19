@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="Firmware serial screenshot placeholder">
-  <rect width="960" height="540" fill="#111"/>
-  <text x="48" y="72" fill="#d4d4d4" font-family="ui-monospace, monospace" font-size="18">[wifi] connected</text>
-  <text x="48" y="108" fill="#d4d4d4" font-family="ui-monospace, monospace" font-size="18">[sniff] promiscuous ON</text>
-  <text x="48" y="160" fill="#a3a3a3" font-family="ui-monospace, monospace" font-size="18">---------- window ----------</text>
-  <text x="48" y="196" fill="#fafafa" font-family="ui-monospace, monospace" font-size="18">avg_rssi=-62  packet_count=184</text>
-  <text x="48" y="232" fill="#86efac" font-family="ui-monospace, monospace" font-size="18">density=41</text>
-  <text x="48" y="280" fill="#a3a3a3" font-family="ui-monospace, monospace" font-size="16">Placeholder serial log</text>
-</svg>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Activity,
@@ -12,31 +13,31 @@ import {
   X,
 } from "lucide-react";
 import {
-  getLocation,
+  formatReadingAge,
+  liveSourceKind,
   statusFromDensity,
   trendDirection,
   type LocationDef,
   type ReadingState,
-  type Recommendation,
 } from "@/lib/crowd";
+import SimGraphs from "@/components/SimGraphs";
 
 type Props = {
+  location: LocationDef;
   selectedId: string | null;
   state: Record<string, ReadingState>;
-  recommendation: Recommendation;
   bestId: string | null;
   demoMode: boolean;
+  sheetExpanded: boolean;
   meta: string;
   liveLoading: boolean;
   onClose: () => void;
+  onCollapse: () => void;
+  onExpand: () => void;
   onSlider: (id: string, value: number) => void;
 };
 
-function TrendGlyph({
-  dir,
-}: {
-  dir: "up" | "down" | "flat" | "none";
-}) {
+function TrendGlyph({ dir }: { dir: "up" | "down" | "flat" | "none" }) {
   if (dir === "up") return <ArrowUpRight size={16} aria-label="trending up" />;
   if (dir === "down")
     return <ArrowDownRight size={16} aria-label="trending down" />;
@@ -45,26 +46,46 @@ function TrendGlyph({
 }
 
 export default function DetailPanel({
+  location: loc,
   selectedId,
   state,
-  recommendation,
   bestId,
   demoMode,
+  sheetExpanded,
   meta,
   liveLoading,
   onClose,
+  onCollapse,
+  onExpand,
   onSlider,
 }: Props) {
   const reduceMotion = useReducedMotion();
-  const loc = selectedId ? getLocation(selectedId) : undefined;
-  const reading = selectedId ? state[selectedId] : undefined;
+  const reading = selectedId === loc.id ? state[loc.id] : undefined;
+  const dragStartY = useRef<number | null>(null);
+
+  function onHandlePointerDown(e: React.PointerEvent) {
+    dragStartY.current = e.clientY;
+  }
+
+  function onHandlePointerUp(e: React.PointerEvent) {
+    const start = dragStartY.current;
+    dragStartY.current = null;
+    if (start == null) return;
+    const dy = e.clientY - start;
+    if (dy < -40) onExpand();
+    else if (dy > 40) onCollapse();
+    else if (Math.abs(dy) < 8) {
+      if (sheetExpanded) onCollapse();
+      else onExpand();
+    }
+  }
 
   return (
     <AnimatePresence mode="wait">
       {loc && reading ? (
         <motion.aside
           key={loc.id}
-          className="detail-panel"
+          className={`detail-panel${sheetExpanded ? " is-expanded" : " is-peek"}`}
           initial={reduceMotion ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={reduceMotion ? undefined : { opacity: 0, y: 6 }}
@@ -72,114 +93,223 @@ export default function DetailPanel({
           aria-label={`${loc.label} details`}
         >
           <div className="detail-panel-inner">
-            <div className="detail-header">
+            <button
+              type="button"
+              className="sheet-handle"
+              aria-label={sheetExpanded ? "Collapse details" : "Expand details"}
+              aria-expanded={sheetExpanded}
+              onPointerDown={onHandlePointerDown}
+              onPointerUp={onHandlePointerUp}
+            />
+
+            <div
+              className="detail-header"
+              onClick={
+                sheetExpanded
+                  ? undefined
+                  : (e) => {
+                      if ((e.target as HTMLElement).closest("button")) return;
+                      onExpand();
+                    }
+              }
+            >
               <div>
                 <p className="detail-kicker">Location</p>
                 <h2>{loc.label}</h2>
               </div>
               <button
                 type="button"
-                className="icon-btn"
+                className="icon-btn sheet-close-desktop"
                 onClick={onClose}
                 aria-label="Close panel"
               >
                 <X size={18} />
               </button>
+              <button
+                type="button"
+                className="icon-btn sheet-collapse-mobile"
+                onClick={onCollapse}
+                aria-label="Collapse panel"
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="detail-chips">
-              {loc.liveSensor ? (
-                <span className="sensor-chip live">
-                  <Radio size={12} aria-hidden /> Sensor
-                </span>
-              ) : (
-                <span className="sensor-chip">
-                  <Wifi size={12} aria-hidden /> Preview
-                </span>
-              )}
-              {bestId === loc.id ? (
-                <span className="sensor-chip best">Best pick</span>
+            <DensityBlock
+              loc={loc}
+              reading={reading}
+              demoMode={demoMode}
+              onPeekClick={sheetExpanded ? undefined : onExpand}
+            />
+
+            <div className="detail-expanded">
+              <div className="detail-chips">
+                {demoMode ? (
+                  loc.liveSensor ? (
+                    <span className="sensor-chip live">
+                      <Radio size={12} aria-hidden /> Sensor
+                    </span>
+                  ) : (
+                    <span className="sensor-chip">
+                      <Wifi size={12} aria-hidden /> Preview
+                    </span>
+                  )
+                ) : (
+                  <LiveSourceChip
+                    src={reading.src}
+                    createdAt={reading.created_at}
+                  />
+                )}
+                {bestId === loc.id ? (
+                  <span className="sensor-chip best">Best pick</span>
+                ) : null}
+              </div>
+
+              {demoMode ? (
+              <p
+                className={`meta-row${!demoMode && liveLoading ? " is-loading" : ""}`}
+                role="status"
+              >
+                {!demoMode && liveLoading ? (
+                  <span className="spinner" aria-hidden />
+                ) : (
+                  <Activity size={14} aria-hidden />
+                )}
+                <span>{meta}</span>
+              </p>
+              ) : null}
+
+              {demoMode ? (
+                <div className="dev-panel embedded">
+                  <h3>Simulate density</h3>
+                  <p className="dev-hint">
+                    Drag to change how busy this spot feels. Pins update live.
+                  </p>
+                  <label className="dev-slider-row">
+                    <span className="dev-slider-label">
+                      {loc.shortLabel}
+                      <span className="dev-slider-val">
+                        {reading.density ?? 0} ·{" "}
+                        {statusFromDensity(reading.density).label}
+                      </span>
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={reading.density ?? 0}
+                      className="dev-range"
+                      onChange={(e) => onSlider(loc.id, Number(e.target.value))}
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              {demoMode ? (
+              <p className="privacy-note">
+                Ambient WiFi activity only — no device tracking, no headcount.
+              </p>
               ) : null}
             </div>
-
-            <DensityBlock loc={loc} reading={reading} />
-
-            <section
-              className={`recommendation compact tone-${recommendation.tone}`}
-              aria-live="polite"
-            >
-              <p className="rec-label">Packed tip</p>
-              <p className="rec-text">{recommendation.text}</p>
-              <p className="rec-detail">{recommendation.detail}</p>
-            </section>
-
-            <p
-              className={`meta-row${!demoMode && liveLoading ? " is-loading" : ""}`}
-              role="status"
-            >
-              {!demoMode && liveLoading ? (
-                <span className="spinner" aria-hidden />
-              ) : (
-                <Activity size={14} aria-hidden />
-              )}
-              <span>{meta}</span>
-            </p>
-
-            {demoMode ? (
-              <div className="dev-panel embedded">
-                <h3>Simulate density</h3>
-                <p className="dev-hint">
-                  Drag to change how busy this spot feels. Pins update live.
-                </p>
-                <label className="dev-slider-row">
-                  <span className="dev-slider-label">
-                    {loc.shortLabel}
-                    <span className="dev-slider-val">
-                      {reading.density ?? 0} ·{" "}
-                      {statusFromDensity(reading.density).label}
-                    </span>
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={reading.density ?? 0}
-                    className="dev-range"
-                    onChange={(e) =>
-                      onSlider(loc.id, Number(e.target.value))
-                    }
-                  />
-                </label>
-              </div>
-            ) : null}
-
-            <p className="privacy-note">
-              Ambient WiFi activity only — no device tracking, no headcount.
-            </p>
           </div>
+          <SimGraphs />
         </motion.aside>
       ) : null}
     </AnimatePresence>
   );
 }
 
+function LiveSourceChip({
+  src,
+  createdAt,
+}: {
+  src: string | null | undefined;
+  createdAt: string | null;
+}) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const kind = liveSourceKind(src, createdAt, nowMs);
+  if (kind === "sim") {
+    return (
+      <span className="sensor-chip sim">
+        <Wifi size={12} aria-hidden /> Simulated
+      </span>
+    );
+  }
+  if (kind === "live") {
+    return (
+      <span className="sensor-chip live">
+        <Radio size={12} aria-hidden /> Live ESP32
+      </span>
+    );
+  }
+  if (kind === "stale") {
+    return (
+      <span className="sensor-chip">
+        <Radio size={12} aria-hidden /> Last ESP32 reading
+      </span>
+    );
+  }
+  return (
+    <span className="sensor-chip">
+      <Wifi size={12} aria-hidden /> No ESP32 row
+    </span>
+  );
+}
+
 function DensityBlock({
   loc,
   reading,
+  demoMode,
+  onPeekClick,
 }: {
   loc: LocationDef;
   reading: ReadingState;
+  demoMode: boolean;
+  onPeekClick?: () => void;
 }) {
   const status = statusFromDensity(reading.density);
   const trend = trendDirection(reading.density, reading.prevDensity);
   const hasData = reading.density != null;
   const dens = reading.density ?? 0;
-  const when = reading.created_at
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (demoMode || !reading.created_at) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [demoMode, reading.created_at]);
+
+  const age = !demoMode ? formatReadingAge(reading.created_at, nowMs) : null;
+  const clock = reading.created_at
     ? new Date(reading.created_at).toLocaleTimeString()
     : "";
+  const when = age ?? (clock ? clock : "");
+  const showTelemetry =
+    !demoMode &&
+    loc.liveSensor &&
+    (reading.avgRssi != null || reading.packetCount != null);
 
   return (
-    <div className="density-block">
+    <div
+      className="density-block"
+      onClick={onPeekClick}
+      role={onPeekClick ? "button" : undefined}
+      tabIndex={onPeekClick ? 0 : undefined}
+      onKeyDown={
+        onPeekClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onPeekClick();
+              }
+            }
+          : undefined
+      }
+    >
       <div className="density-block-top">
         <span
           className={`density-readout${!hasData ? " unknown" : ""}`}
@@ -194,10 +324,25 @@ function DensityBlock({
           <span className={`status-pill ${status.key}`}>{status.label}</span>
         </div>
       </div>
-      <p className="sub">
-        {hasData ? `${dens}/100` : loc.liveSensor ? "awaiting sensor" : "no data"}
+      <p className="sub density-meta">
+        {hasData
+          ? `${dens}/100`
+          : loc.liveSensor
+            ? "awaiting sensor"
+            : "no data"}
         {when ? ` · ${when}` : ""}
       </p>
+      {showTelemetry ? (
+        <p className="sub telemetry">
+          {reading.avgRssi != null
+            ? `RSSI ${reading.avgRssi.toFixed(1)} dBm`
+            : "RSSI —"}
+          {" · "}
+          {reading.packetCount != null
+            ? `${reading.packetCount} packets`
+            : "no packets"}
+        </p>
+      ) : null}
       <div className="density-bar" aria-hidden="true">
         <div
           className={`density-fill ${status.key}`}

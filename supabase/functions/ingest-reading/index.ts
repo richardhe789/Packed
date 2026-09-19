@@ -12,6 +12,7 @@ type ReadingInsert = {
   packet_count: number;
   density: number;
   location: string;
+  src: "esp32";
 };
 
 function jsonResponse(
@@ -58,6 +59,7 @@ function parseReadingBody(raw: unknown): ReadingInsert | null {
     packet_count: o.packet_count,
     density: o.density,
     location: o.location.trim(),
+    src: "esp32",
   };
 }
 

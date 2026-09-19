@@ -13,6 +13,7 @@ Sliders prove the UI; they don’t prove the product. Generate synthetic (or rep
 - Live mode can be demoed without an ESP32 on-site.
 - Charts / trends (when added) have something interesting to show.
 - Threshold tuning can be practiced offline before venue day.
+- Track movement history in a certain building
 
 ### Ideas (pick one first)
 

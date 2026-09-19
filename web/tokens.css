@@ -183,8 +183,10 @@
   --radius: var(--radius-card);
 
   --panel-width: min(360px, 92vw);
-  --topbar-h: 72px;
+  --topbar-h: 88px;
   --page-gutter: var(--space-md);
+  --sheet-peek-h: 10.5rem;
+  --map-bottom-pad: 0px;
 }
 
 /* Hum dark — cream ink on cool paper, same multi-accent */

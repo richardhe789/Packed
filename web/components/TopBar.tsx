@@ -1,30 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Moon, Radio, Sun } from "lucide-react";
-import type { Recommendation } from "@/lib/crowd";
+import { useEffect, useId, useRef, useState } from "react";
+import { Moon, MoreVertical, Radio, Sun } from "lucide-react";
 import { applyTheme, resolveTheme, toggleTheme, type Theme } from "@/lib/theme";
 
 type Props = {
   demoMode: boolean;
-  recommendation: Recommendation;
   onDemo: () => void;
   onLive: () => void;
 };
 
 export default function TopBar({
   demoMode,
-  recommendation,
   onDemo,
   onLive,
 }: Props) {
   const [theme, setTheme] = useState<Theme>("light");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuId = useId();
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const initial = resolveTheme();
     applyTheme(initial);
     setTheme(initial);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
 
   return (
     <header className="map-topbar">
@@ -36,33 +52,21 @@ export default function TopBar({
           rel="noreferrer"
           title="Virginia Tech"
         >
-          {/* Demo lockup using VT brand colors. Official assets: brand.vt.edu */}
+          {/* Wikimedia Commons vector of the athletic VT. Official files: brand.vt.edu (license required). */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/vt-logo.svg"
             alt="Virginia Tech"
             className="vt-logo"
-            width={120}
-            height={56}
+            width={140}
+            height={64}
           />
         </a>
-        <div className="brand-divider" aria-hidden />
-        <div className="brand-lockup-text">
-          <span className={`live-dot${!demoMode ? " on" : ""}`} aria-hidden />
-          <div className="brand-text-stack">
-            <p className="brand">Packed</p>
-            <p className="brand-sub">Virginia Tech · Blacksburg</p>
-            <p
-              className={`brand-tip tone-${recommendation.tone}`}
-              title={recommendation.detail}
-            >
-              {recommendation.text}
-            </p>
-          </div>
-        </div>
       </div>
 
-      <div className="topbar-actions">
+      <h1 className="map-topbar-title">PACKED</h1>
+
+      <div className="topbar-actions" ref={wrapRef}>
         <button
           type="button"
           className={`theme-switch${theme === "dark" ? " is-dark" : ""}`}
@@ -79,7 +83,7 @@ export default function TopBar({
           <span className="theme-switch-thumb" aria-hidden />
         </button>
 
-        <div className="mode-toggle" role="group" aria-label="Data mode">
+        <div className="mode-toggle desktop-mode" role="group" aria-label="Data mode">
           <button
             type="button"
             className={`mode-btn${demoMode ? " active" : ""}`}
@@ -98,6 +102,45 @@ export default function TopBar({
             Live
           </button>
         </div>
+
+        <button
+          type="button"
+          className="icon-btn overflow-btn"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          aria-controls={menuId}
+          onClick={() => setMenuOpen((o) => !o)}
+        >
+          <MoreVertical size={18} />
+        </button>
+
+        {menuOpen ? (
+          <div id={menuId} className="overflow-menu" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              className={`overflow-item${demoMode ? " is-active" : ""}`}
+              onClick={() => {
+                onDemo();
+                setMenuOpen(false);
+              }}
+            >
+              Demo
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={`overflow-item${!demoMode ? " is-active" : ""}`}
+              onClick={() => {
+                onLive();
+                setMenuOpen(false);
+              }}
+            >
+              <Radio size={14} aria-hidden />
+              Live
+            </button>
+          </div>
+        ) : null}
       </div>
     </header>
   );

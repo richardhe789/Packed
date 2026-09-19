@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="Live mode screenshot placeholder">
-  <rect width="960" height="540" fill="#fafafa"/>
-  <rect x="24" y="24" width="912" height="492" rx="16" fill="#fff" stroke="#e4e4e7"/>
-  <text x="48" y="80" fill="#111" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700">Live mode</text>
-  <text x="48" y="116" fill="#71717a" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16">Placeholder  ESP32 ’ Supabase poll</text>
-  <rect x="48" y="160" width="220" height="40" rx="20" fill="#111"/>
-  <text x="78" y="186" fill="#fff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14">LIVE</text>
-</svg>
