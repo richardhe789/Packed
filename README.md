@@ -107,7 +107,7 @@ Open [http://localhost:3000](http://localhost:3000). Demo is the default. Use th
 firmware/include/config.h.example  →  firmware/include/config.h
 ```
 
-Fill `WIFI_SSID` / `WIFI_PASSWORD` (phone hotspot), `SUPABASE_URL` / `SUPABASE_API_KEY` (anon key), `DEVICE_INGEST_KEY` (must match the Edge Function secret), optional `LOCATION_ID` / `INGEST_PATH`. Build and upload with [PlatformIO](https://platformio.org/). Serial at **115200**.
+Fill `WIFI_SSID` / `WIFI_PASSWORD` (phone hotspot), `SUPABASE_URL` / `SUPABASE_API_KEY` (anon key), and `DEVICE_INGEST_KEY` (must match the Edge Function secret). Configure the manual location only in root [`location.config.json`](location.config.json): ID, label, latitude, and longitude. Build and upload with [PlatformIO](https://platformio.org/). Serial at **115200**.
 
 That is the path: **copy env → run the map**, or **copy `config.h` → flash the sensor**.
 
@@ -124,7 +124,7 @@ That is the path: **copy env → run the map**, or **copy `config.h` → flash t
 ### Demo vs Live
 
 - **Demo** — seeded crowd levels and sliders. No ESP32 required. Best for the multi-building “go here, not there” story.
-- **Live** — polls Supabase for `dining_hall_main` about every 30s. Honest story today: how packed is Dietrick.
+- **Live** — polls Supabase for the ID in `location.config.json` about every 30s. Honest story today: how packed is the configured sensor location.
 
 ### Venue loop
 
@@ -151,6 +151,8 @@ Ambient WiFi frames
 | `web/` | Next.js App Router UI (Vercel root) |
 | `firmware/include/config.h.example` | WiFi + Supabase secrets template |
 | `web/.env.example` | Next.js Supabase env template |
+| [`location.config.json`](location.config.json) | The one manual ESP32/dashboard testing location |
+| [`LOCATION.md`](LOCATION.md) | Move-the-sensor instructions |
 | `art/` | README banner / gallery placeholders |
 | [`NEXT_STEPS.md`](NEXT_STEPS.md) | Post-hackathon roadmap |
 | [`PRESENTATION.md`](PRESENTATION.md) | Judge demo script |
@@ -161,7 +163,7 @@ PlatformIO may regenerate `compile_commands.json` locally; it is gitignored.
 
 1. Install PlatformIO (VS Code / Cursor extension is fine).
 2. Copy `config.h.example` → `config.h` (gitignored).
-3. Fill in hotspot WiFi, `SUPABASE_URL` / anon `SUPABASE_API_KEY`, and `DEVICE_INGEST_KEY` (must match the `ingest-reading` Edge Function secret). Optional: `LOCATION_ID`, `INGEST_PATH`.
+3. Fill in hotspot WiFi, `SUPABASE_URL` / anon `SUPABASE_API_KEY`, and `DEVICE_INGEST_KEY` (must match the `ingest-reading` Edge Function secret). Set the location ID, label, and Google Maps coordinates only in root `location.config.json`.
 4. Open `firmware/`, build & upload.
 5. Serial Monitor at **115200**.
 
@@ -225,8 +227,10 @@ curl -X POST "https://myjfbuathehfghagbnot.supabase.co/functions/v1/ingest-readi
   -H "Authorization: Bearer $ANON_KEY" \
   -H "Content-Type: application/json" \
   -H "x-device-key: $DEVICE_INGEST_KEY" \
-  -d "{\"avg_rssi\":-60,\"packet_count\":100,\"density\":50,\"location\":\"dining_hall_main\"}"
+-d "{\"avg_rssi\":-60,\"packet_count\":100,\"density\":50,\"location\":\"dining_hall_main\"}"
 ```
+
+The firmware and dashboard use the same ID from `location.config.json`; the live marker also uses its label and manual coordinates. No GPS or automatic location detection is used.
 
 ## Web UI
 

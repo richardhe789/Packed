@@ -4,6 +4,10 @@
   "private": true,
   "packageManager": "pnpm@11.20.0",
   "scripts": {
+    "sync:location": "node ../scripts/generate-location-config.mjs",
+    "predev": "node ../scripts/generate-location-config.mjs",
+    "prebuild": "node ../scripts/generate-location-config.mjs",
+    "typecheck": "node ../scripts/generate-location-config.mjs && tsc --noEmit",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
