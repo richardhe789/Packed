@@ -73,6 +73,37 @@ Ambient WiFi frames
 
 For faster bench testing, use the `esp32dev_short` PlatformIO env (30s windows).
 
+### Real ESP32 board: upload, verify, and debug
+
+1. In ignored `firmware/include/config.h`, set the phone hotspot SSID/password,
+   `https://myjfbuathehfghagbnot.supabase.co`, the project's anon key, and
+   `LOCATION_ID` = `dining_hall_main`. Enable the hotspot before powering the
+   board; choose 2.4 GHz if the phone offers a band setting.
+2. Connect a data-capable USB cable. From `firmware/`, upload a short test or
+   the standard five-minute build:
+
+   ```powershell
+   pio run -e esp32dev_short --target upload
+   pio run -e esp32dev --target upload
+   ```
+
+   If necessary, run `pio device list` and append `--upload-port COM<number>`.
+   Hold the board's **BOOT** button as upload starts only when it cannot enter
+   the bootloader automatically.
+3. Monitor the board:
+
+   ```powershell
+   pio device monitor -b 115200
+   ```
+
+   Expect `[wifi] connected`, `[sniff] promiscuous ON`, then `[http] POST ok`.
+   Confirm the row in Supabase Table Editor and wait up to 30 seconds for the
+   dashboard's Live poll.
+4. `[fatal] Invalid local config.h` means a placeholder key or Dashboard URL
+   remains; Wi-Fi failure means hotspot band/credentials/range; HTTP 401/403
+   means anon key or RLS; HTTP 404 means the schema or URL is wrong. Use the
+   short environment while debugging.
+
 ### Channel / radio notes
 
 - Default sniff channel = hotspot AP channel (`SNIFF_CHANNEL 0`).
@@ -87,6 +118,24 @@ Firmware never reads or stores MAC addresses — only RSSI sums and packet count
 ## Supabase
 
 Project: **ProjectSolver** (`myjfbuathehfghagbnot`)
+
+1. In that project's Supabase dashboard, open **SQL Editor** and run
+   [`supabase/schema.sql`](supabase/schema.sql). It creates `public.readings`,
+   a location/time index, and the anonymous `SELECT` / `INSERT` RLS policies
+   required for this demo.
+2. Open **Project Settings → API** and copy the Project URL and its
+   publishable/anon key. The Project URL is
+   `https://myjfbuathehfghagbnot.supabase.co`; do not use the browser's
+   `supabase.com/dashboard/...` URL.
+3. Place the same URL and anon key in ignored local files only:
+
+   ```text
+   firmware/include/config.h    SUPABASE_URL, SUPABASE_API_KEY
+   web/.env.local               NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+   ```
+
+   Keep `LOCATION_ID` set to `dining_hall_main`; it is the dashboard's live
+   location and the location accepted by the insert policy.
 
 Table `public.readings`:
 
@@ -111,6 +160,9 @@ curl -X POST "https://myjfbuathehfghagbnot.supabase.co/rest/v1/readings" \
   -H "Prefer: return=representation" \
   -d "{\"avg_rssi\":-60,\"packet_count\":100,\"density\":50,\"location\":\"dining_hall_main\"}"
 ```
+
+After the request returns 2xx, open the dashboard with `?live=1`. It queries
+the newest `readings` rows for `location=dining_hall_main` every 30 seconds.
 
 ## Web UI (Next.js)
 
