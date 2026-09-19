@@ -14,15 +14,21 @@
 #include <WiFiClientSecure.h>
 #include <esp_wifi.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
+#include <math.h>
+#include <string.h>
 
 #include "config.h"
 #include "location_config.generated.h"
 
-// --- Tunable density thresholds (edit live at venue) ---
-static const float RSSI_THRESHOLD = 10.0f;    // % drop required
-static const float PACKET_THRESHOLD = 15.0f;  // % rise required
-static const int STEP_UP = 10;
-static const int STEP_DOWN = 5;
+// --- Tunable packet-density mapping (edit live at venue) ---
+static const uint8_t PACKET_ROLLING_WINDOWS = 3;
+static const float BUSY_PACKET_INCREASE_PCT = 20.0f;
+static const float TARGET_BUSY_PACKET_INCREASE_PCT = 100.0f;
+static const float DENSITY_DEADBAND = 8.0f;
+static const int DENSITY_MAX_STEP = 12;
+// Quiet-room calibration uses this many full measurement windows.
+static const uint8_t BASELINE_WINDOWS = 3;
 
 // Window length (ms). Use 5 min for demo; shorten for faster testing via SHORT_WINDOWS.
 #ifndef SHORT_WINDOWS
@@ -39,6 +45,35 @@ static const unsigned long WINDOW_MS = 30UL * 1000UL;  // 30s for bench testing
 #endif
 
 static const char *LOCATION = LOCATION_ID;
+static const char *BASELINE_NAMESPACE = "crowd_base";
+
+static Preferences preferences;
+static bool baselineValid = false;
+static float baselineAvgRssi = 0.0f;
+static float baselineAvgPackets = 0.0f;
+static String baselineLocation;
+static bool manualAnchorValid = false;
+static float manualAnchorPackets = 0.0f;
+static int manualAnchorDensity = 0;
+static String manualAnchorLocation;
+static bool calibrationActive = false;
+static uint8_t calibrationWindowsCollected = 0;
+static float calibrationRssiTotal = 0.0f;
+static float calibrationPacketsTotal = 0.0f;
+static uint32_t packetHistory[PACKET_ROLLING_WINDOWS] = {};
+static uint8_t packetHistoryCount = 0;
+static uint8_t packetHistoryNext = 0;
+static bool hasSmoothedPacketSample = false;
+static float latestSmoothedPackets = 0.0f;
+static int density = 0;
+static unsigned long windowStartMs = 0;
+static bool serialAnchorPending = false;
+static char serialAnchorDigits[4] = {};
+static uint8_t serialAnchorLength = 0;
+static unsigned long serialAnchorLastByteMs = 0;
+
+static void resetWindowAccumulators();
+static void resetPacketSmoothing();
 
 static bool hasPlaceholder(const char *value) {
   return value == nullptr || value[0] == '\0' || String(value).indexOf("YOUR_") >= 0;
@@ -53,17 +88,284 @@ static bool hasUsableConfig() {
          url.indexOf("supabase.com/dashboard") < 0;
 }
 
+static void printBaselineStatus() {
+  if (!baselineValid) {
+    Serial.printf("[baseline] no usable baseline for location=%s; send C in a quiet room\n", LOCATION);
+    return;
+  }
+  Serial.printf("[baseline] loaded location=%s avg_rssi=%.2f avg_packets=%.2f\n",
+                baselineLocation.c_str(), baselineAvgRssi, baselineAvgPackets);
+}
+
+static void printManualAnchorStatus() {
+  if (!manualAnchorValid) {
+    Serial.printf("[anchor] no usable manual anchor for location=%s\n", LOCATION);
+    return;
+  }
+  Serial.printf("[anchor] loaded location=%s packets=%.2f density=%d\n",
+                manualAnchorLocation.c_str(), manualAnchorPackets, manualAnchorDensity);
+}
+
+static void printCalibrationStatus() {
+  printBaselineStatus();
+  printManualAnchorStatus();
+  if (hasSmoothedPacketSample) {
+    Serial.printf("[status] location=%s smoothed_packets=%.2f density=%d\n",
+                  LOCATION, latestSmoothedPackets, density);
+  } else {
+    Serial.printf("[status] location=%s no smoothed packet sample yet density=%d\n",
+                  LOCATION, density);
+  }
+}
+
+static void loadBaseline() {
+  baselineValid = false;
+  baselineLocation = "";
+  if (!preferences.begin(BASELINE_NAMESPACE, true)) {
+    Serial.println(F("[baseline] NVS unavailable; calibration will not persist"));
+    return;
+  }
+
+  const bool savedValid = preferences.getBool("valid", false);
+  const String savedLocation = preferences.getString("location", "");
+  const float savedRssi = preferences.getFloat("avg_rssi", NAN);
+  const float savedPackets = preferences.getFloat("avg_packets", NAN);
+  preferences.end();
+
+  if (!savedValid) {
+    Serial.println(F("[baseline] no saved calibration"));
+    return;
+  }
+  if (!isfinite(savedRssi) || !isfinite(savedPackets) || savedPackets < 0.0f ||
+      savedLocation.length() == 0 || savedLocation.length() > 64) {
+    Serial.println(F("[baseline] saved calibration is invalid/corrupt; send C to recalibrate"));
+    return;
+  }
+  if (savedLocation != LOCATION) {
+    Serial.printf("[baseline] saved for location=%s, current=%s; send C to calibrate this location\n",
+                  savedLocation.c_str(), LOCATION);
+    return;
+  }
+
+  baselineAvgRssi = savedRssi;
+  baselineAvgPackets = savedPackets;
+  baselineLocation = savedLocation;
+  baselineValid = true;
+  printBaselineStatus();
+}
+
+static void loadManualAnchor() {
+  manualAnchorValid = false;
+  manualAnchorLocation = "";
+  if (!preferences.begin(BASELINE_NAMESPACE, true)) {
+    Serial.println(F("[anchor] NVS unavailable; manual anchor not loaded"));
+    return;
+  }
+  const bool savedValid = preferences.getBool("anchor_valid", false);
+  const String savedLocation = preferences.getString("anchor_location", "");
+  const float savedPackets = preferences.getFloat("anchor_packets", NAN);
+  const uint32_t savedDensity = preferences.getUInt("anchor_density", 101);
+  preferences.end();
+
+  if (!savedValid) {
+    return;
+  }
+  if (!isfinite(savedPackets) || savedPackets < 0.0f || savedDensity > 100 ||
+      savedLocation.length() == 0 || savedLocation.length() > 64) {
+    Serial.println(F("[anchor] saved anchor is invalid/corrupt; send S<number> again"));
+    return;
+  }
+  if (savedLocation != LOCATION) {
+    Serial.printf("[anchor] saved for location=%s, current=%s; send S<number> again\n",
+                  savedLocation.c_str(), LOCATION);
+    return;
+  }
+  if (baselineValid && savedDensity > 0 && savedPackets <= baselineAvgPackets) {
+    Serial.println(F("[anchor] saved anchor is not above the current quiet baseline; send S<number> again"));
+    return;
+  }
+
+  manualAnchorPackets = savedPackets;
+  manualAnchorDensity = static_cast<int>(savedDensity);
+  manualAnchorLocation = savedLocation;
+  manualAnchorValid = true;
+  printManualAnchorStatus();
+}
+
+static bool saveBaseline(float avgRssi, float avgPackets) {
+  if (!isfinite(avgRssi) || !isfinite(avgPackets) || avgPackets < 0.0f ||
+      !preferences.begin(BASELINE_NAMESPACE, false)) {
+    Serial.println(F("[baseline] failed to open NVS for saving"));
+    return false;
+  }
+  const bool saved = preferences.putFloat("avg_rssi", avgRssi) == sizeof(float) &&
+                     preferences.putFloat("avg_packets", avgPackets) == sizeof(float) &&
+                     preferences.putString("location", LOCATION) == strlen(LOCATION) &&
+                     preferences.putBool("valid", true) == sizeof(bool);
+  preferences.end();
+  if (!saved) {
+    Serial.println(F("[baseline] failed to save calibration"));
+    return false;
+  }
+
+  baselineAvgRssi = avgRssi;
+  baselineAvgPackets = avgPackets;
+  baselineLocation = LOCATION;
+  baselineValid = true;
+  return true;
+}
+
+static bool saveManualAnchor(int anchorDensity) {
+  if (!baselineValid) {
+    Serial.println(F("[anchor] quiet baseline required before S<number>"));
+    return false;
+  }
+  if (!hasSmoothedPacketSample) {
+    Serial.println(F("[anchor] no smoothed packet sample yet; wait for a measurement window"));
+    return false;
+  }
+  if (anchorDensity < 0 || anchorDensity > 100) {
+    Serial.println(F("[anchor] density must be an integer from 0 through 100"));
+    return false;
+  }
+  if (anchorDensity > 0 && latestSmoothedPackets <= baselineAvgPackets) {
+    Serial.println(F("[anchor] packet activity must be above the quiet baseline for a nonzero anchor"));
+    return false;
+  }
+  if (!preferences.begin(BASELINE_NAMESPACE, false)) {
+    Serial.println(F("[anchor] failed to open NVS for saving"));
+    return false;
+  }
+  const bool saved = preferences.putFloat("anchor_packets", latestSmoothedPackets) == sizeof(float) &&
+                     preferences.putUInt("anchor_density", anchorDensity) == sizeof(uint32_t) &&
+                     preferences.putString("anchor_location", LOCATION) == strlen(LOCATION) &&
+                     preferences.putBool("anchor_valid", true) == sizeof(bool);
+  preferences.end();
+  if (!saved) {
+    Serial.println(F("[anchor] failed to save manual anchor"));
+    return false;
+  }
+
+  manualAnchorPackets = latestSmoothedPackets;
+  manualAnchorDensity = anchorDensity;
+  manualAnchorLocation = LOCATION;
+  manualAnchorValid = true;
+  Serial.printf("[anchor] saved packets=%.2f density=%d location=%s\n",
+                manualAnchorPackets, manualAnchorDensity, LOCATION);
+  return true;
+}
+
+static void clearManualAnchor() {
+  manualAnchorValid = false;
+  manualAnchorPackets = 0.0f;
+  manualAnchorDensity = 0;
+  manualAnchorLocation = "";
+  if (!preferences.begin(BASELINE_NAMESPACE, false)) {
+    Serial.println(F("[anchor] NVS unavailable; in-memory anchor cleared"));
+    return;
+  }
+  preferences.remove("anchor_packets");
+  preferences.remove("anchor_density");
+  preferences.remove("anchor_location");
+  preferences.remove("anchor_valid");
+  preferences.end();
+  Serial.println(F("[anchor] cleared from NVS"));
+}
+
+static void startCalibration() {
+  calibrationActive = true;
+  calibrationWindowsCollected = 0;
+  calibrationRssiTotal = 0.0f;
+  calibrationPacketsTotal = 0.0f;
+  density = 0;
+  resetPacketSmoothing();
+  resetWindowAccumulators();
+  windowStartMs = millis();
+  Serial.printf("[calibration] started for location=%s; keep the room quiet for %u windows\n",
+                LOCATION, BASELINE_WINDOWS);
+}
+
+static void clearBaseline() {
+  calibrationActive = false;
+  calibrationWindowsCollected = 0;
+  baselineValid = false;
+  baselineLocation = "";
+  baselineAvgRssi = 0.0f;
+  baselineAvgPackets = 0.0f;
+  density = 0;
+  resetPacketSmoothing();
+  if (preferences.begin(BASELINE_NAMESPACE, false)) {
+    preferences.clear();
+    preferences.end();
+    Serial.println(F("[baseline] cleared from NVS; send C to calibrate"));
+  } else {
+    Serial.println(F("[baseline] NVS unavailable; in-memory baseline cleared"));
+  }
+}
+
+static void resetAnchorCommand() {
+  serialAnchorPending = false;
+  serialAnchorLength = 0;
+  serialAnchorDigits[0] = '\0';
+}
+
+static void finishAnchorCommand() {
+  if (!serialAnchorPending) return;
+  if (serialAnchorLength == 0) {
+    Serial.println(F("[serial] use S<number>, for example S30"));
+    resetAnchorCommand();
+    return;
+  }
+  serialAnchorDigits[serialAnchorLength] = '\0';
+  const int anchorDensity = atoi(serialAnchorDigits);
+  saveManualAnchor(anchorDensity);
+  resetAnchorCommand();
+}
+
+static void handleSerialCommands() {
+  while (Serial.available() > 0) {
+    const char command = static_cast<char>(Serial.read());
+    if (serialAnchorPending) {
+      if (command >= '0' && command <= '9' && serialAnchorLength < 3) {
+        serialAnchorDigits[serialAnchorLength++] = command;
+        serialAnchorLastByteMs = millis();
+      } else if (command == '\r' || command == '\n') {
+        finishAnchorCommand();
+      } else {
+        Serial.println(F("[serial] invalid S command; use S0 through S100"));
+        resetAnchorCommand();
+      }
+      continue;
+    }
+
+    switch (command) {
+      case 'S': case 's':
+        serialAnchorPending = true;
+        serialAnchorLength = 0;
+        serialAnchorLastByteMs = millis();
+        break;
+      case 'C': case 'c': startCalibration(); break;
+      case 'X': case 'x': clearBaseline(); break;
+      case 'A': case 'a': clearManualAnchor(); break;
+      case 'B': case 'b': printCalibrationStatus(); break;
+      case '\r': case '\n': case ' ': break;
+      default:
+        Serial.println(F("[serial] commands: C, X, B, A, or S<number> (for example S30)"));
+        break;
+    }
+  }
+
+  // Handles serial monitors configured without a line ending without waiting.
+  if (serialAnchorPending && millis() - serialAnchorLastByteMs >= 150UL) {
+    finishAnchorCommand();
+  }
+}
+
 // --- Window accumulators (updated from promiscuous callback) ---
 static portMUX_TYPE sniffMux = portMUX_INITIALIZER_UNLOCKED;
 static volatile int64_t rssiSum = 0;
 static volatile uint32_t packetCount = 0;
 
-static float prevAvgRssi = 0.0f;
-static uint32_t prevPacketCount = 0;
-static bool hasPrevWindow = false;
-static int density = 0;
-
-static unsigned long windowStartMs = 0;
 static bool sniffing = false;
 static uint8_t activeSniffChannel = 1;
 
@@ -176,11 +478,30 @@ static void snapshotWindow(int64_t *outRssiSum, uint32_t *outPackets) {
   portEXIT_CRITICAL(&sniffMux);
 }
 
-static float pctChange(float current, float previous) {
-  if (previous == 0.0f) {
-    return current == 0.0f ? 0.0f : 100.0f;
+static void resetPacketSmoothing() {
+  for (uint8_t i = 0; i < PACKET_ROLLING_WINDOWS; i++) {
+    packetHistory[i] = 0;
   }
-  return ((current - previous) / previous) * 100.0f;
+  packetHistoryCount = 0;
+  packetHistoryNext = 0;
+  hasSmoothedPacketSample = false;
+  latestSmoothedPackets = 0.0f;
+}
+
+static float addPacketSampleAndAverage(uint32_t packets) {
+  packetHistory[packetHistoryNext] = packets;
+  packetHistoryNext = (packetHistoryNext + 1) % PACKET_ROLLING_WINDOWS;
+  if (packetHistoryCount < PACKET_ROLLING_WINDOWS) {
+    packetHistoryCount += 1;
+  }
+
+  float total = 0.0f;
+  for (uint8_t i = 0; i < packetHistoryCount; i++) {
+    total += static_cast<float>(packetHistory[i]);
+  }
+  latestSmoothedPackets = total / packetHistoryCount;
+  hasSmoothedPacketSample = true;
+  return latestSmoothedPackets;
 }
 
 static bool pushReadingToSupabase(float avgRssi, uint32_t packets, int dens) {
@@ -240,33 +561,104 @@ static void processWindow() {
 
   float rssiDeltaPct = 0.0f;
   float packetDeltaPct = 0.0f;
+  float smoothedPackets = 0.0f;
+  int targetDensity = density;
+  const char *updateReason = "waiting";
 
-  if (hasPrevWindow) {
-    rssiDeltaPct = pctChange(avgRssi, prevAvgRssi);
-    packetDeltaPct = pctChange(static_cast<float>(packets),
-                               static_cast<float>(prevPacketCount));
+  if (calibrationActive) {
+    calibrationRssiTotal += avgRssi;
+    calibrationPacketsTotal += static_cast<float>(packets);
+    calibrationWindowsCollected += 1;
+    density = 0;
+    targetDensity = 0;
+    updateReason = "calibrating";
+    Serial.printf("[calibration] window %u/%u avg_rssi=%.2f packets=%u\n",
+                  calibrationWindowsCollected, BASELINE_WINDOWS, avgRssi, packets);
+    if (calibrationWindowsCollected >= BASELINE_WINDOWS) {
+      const float calibratedRssi = calibrationRssiTotal / BASELINE_WINDOWS;
+      const float calibratedPackets = calibrationPacketsTotal / BASELINE_WINDOWS;
+      calibrationActive = false;
+      if (saveBaseline(calibratedRssi, calibratedPackets)) {
+        Serial.println(F("[calibration] complete and saved to NVS; safe to power off"));
+        printBaselineStatus();
+      }
+    }
+  } else if (baselineValid) {
+    smoothedPackets = addPacketSampleAndAverage(packets);
+    // RSSI remains diagnostic only; packet activity determines density.
+    const float rssiMagnitude = fabsf(baselineAvgRssi);
+    if (rssiMagnitude >= 0.1f) {
+      rssiDeltaPct = ((baselineAvgRssi - avgRssi) / rssiMagnitude) * 100.0f;
+    }
+    if (baselineAvgPackets > 0.0f) {
+      packetDeltaPct = ((smoothedPackets - baselineAvgPackets) /
+                        baselineAvgPackets) * 100.0f;
+    } else if (smoothedPackets > 0.0f) {
+      packetDeltaPct = 100.0f;
+    }
 
-    const bool rssiDropped = rssiDeltaPct <= -RSSI_THRESHOLD;
-    const bool packetsRose = packetDeltaPct >= PACKET_THRESHOLD;
-
-    if (rssiDropped && packetsRose) {
-      density = min(100, density + STEP_UP);
+    if (packetHistoryCount < PACKET_ROLLING_WINDOWS) {
+      updateReason = "smoothing-warmup";
+    } else if (fabsf(packetDeltaPct) <= DENSITY_DEADBAND) {
+      updateReason = "deadband-hold";
     } else {
-      density = max(0, density - STEP_DOWN);
+      if (manualAnchorValid && manualAnchorDensity > 0 &&
+          manualAnchorPackets > baselineAvgPackets) {
+        const float anchorSpan = manualAnchorPackets - baselineAvgPackets;
+        if (smoothedPackets <= baselineAvgPackets) {
+          targetDensity = 0;
+          updateReason = "anchor-below-baseline";
+        } else if (smoothedPackets <= manualAnchorPackets) {
+          targetDensity = static_cast<int>(roundf(
+              ((smoothedPackets - baselineAvgPackets) / anchorSpan) * manualAnchorDensity));
+          updateReason = "anchor-interpolate";
+        } else {
+          // Continue at the same slope above the subjective anchor until 100.
+          targetDensity = static_cast<int>(roundf(
+              manualAnchorDensity +
+              ((smoothedPackets - manualAnchorPackets) / anchorSpan) * manualAnchorDensity));
+          updateReason = "anchor-extend";
+        }
+      } else if (manualAnchorValid) {
+        targetDensity = 0;
+        updateReason = "anchor-zero";
+      } else {
+        targetDensity = static_cast<int>(roundf(
+            (packetDeltaPct / TARGET_BUSY_PACKET_INCREASE_PCT) * 100.0f));
+        updateReason = packetDeltaPct >= BUSY_PACKET_INCREASE_PCT
+                           ? "baseline-map-busy"
+                           : "baseline-map";
+      }
+      targetDensity = constrain(targetDensity, 0, 100);
+      if (density < targetDensity) {
+        density = min(targetDensity, density + DENSITY_MAX_STEP);
+        if (strcmp(updateReason, "anchor-interpolate") == 0 ||
+            strcmp(updateReason, "anchor-extend") == 0) {
+          updateReason = "anchor-rise";
+        }
+      } else if (density > targetDensity) {
+        density = max(targetDensity, density - DENSITY_MAX_STEP);
+        updateReason = manualAnchorValid ? "anchor-fall" : "below-target-fall";
+      } else {
+        updateReason = "at-target";
+      }
     }
   } else {
-    Serial.println(F("[window] first window — establishing baseline, density unchanged"));
+    density = 0;
+    targetDensity = 0;
+    updateReason = "no-baseline";
+    Serial.println(F("[baseline] no active calibration; send C in a quiet room"));
   }
 
   Serial.println(F("---------- window ----------"));
-  Serial.printf("  avg_rssi=%.2f  packet_count=%u\n", avgRssi, packets);
-  Serial.printf("  rssi_%%Δ=%.1f  packet_%%Δ=%.1f\n", rssiDeltaPct, packetDeltaPct);
-  Serial.printf("  density=%d\n", density);
+  Serial.printf("  avg_rssi=%.2f  raw_packets=%u  smoothed_packets=%.2f\n",
+                avgRssi, packets, smoothedPackets);
+  Serial.printf("  quiet_baseline_packets=%.2f  anchor_packets=%.2f anchor_density=%d\n",
+                baselineAvgPackets, manualAnchorPackets, manualAnchorDensity);
+  Serial.printf("  packet_%%Δ=%.1f  rssi_%%Δ=%.1f\n", packetDeltaPct, rssiDeltaPct);
+  Serial.printf("  target_density=%d  density=%d  reason=%s\n",
+                targetDensity, density, updateReason);
   Serial.println(F("----------------------------"));
-
-  prevAvgRssi = avgRssi;
-  prevPacketCount = packets;
-  hasPrevWindow = true;
 
   // Radio: pause sniff → POST → resume (single-radio coexistence)
   pauseSniffForUpload();
@@ -311,15 +703,21 @@ void setup() {
   }
 
   resetWindowAccumulators();
+  loadBaseline();
+  loadManualAnchor();
   startSniffing();
   windowStartMs = millis();
   Serial.printf("[ready] window=%lu ms  location=%s\n", WINDOW_MS, LOCATION);
-  Serial.println(F("[ready] Tunables: RSSI_THRESHOLD, PACKET_THRESHOLD, STEP_UP, STEP_DOWN"));
+  Serial.println(F("[ready] Commands: C=quiet baseline, S<number>=anchor, A=clear anchor, X=clear baseline, B=status"));
+  Serial.printf("[ready] Baseline calibration uses %u windows\n", BASELINE_WINDOWS);
+  Serial.printf("[ready] Packet score: %u-window average, %d max step, %.0f%% deadband\n",
+                PACKET_ROLLING_WINDOWS, DENSITY_MAX_STEP, DENSITY_DEADBAND);
 }
 
 void loop() {
   // Keep STA alive when possible; if sniff channel differs from AP, association
   // may drop until pauseSniffForUpload reconnects — that is expected.
+  handleSerialCommands();
   if (millis() - windowStartMs >= WINDOW_MS) {
     processWindow();
   }
