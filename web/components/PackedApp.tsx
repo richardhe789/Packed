@@ -58,7 +58,6 @@ export default function PackedApp() {
   const [selectedId, setSelectedId] = useState<string | null>(
     SENSOR_LOCATION.id,
   );
-  const [editPin, setEditPin] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
 
   const liveGenerationRef = useRef(0);
@@ -96,7 +95,6 @@ export default function PackedApp() {
     setMeta("Live · fetching…");
     setLiveLoading(true);
     setSelectedId(SENSOR_LOCATION.id);
-    setEditPin(false);
     syncUrl(false);
   }, [syncUrl]);
 
@@ -207,13 +205,43 @@ export default function PackedApp() {
       }
     };
 
-    void runPoll();
-    const intervalId = window.setInterval(() => {
+    let intervalId: number | null = null;
+
+    function stopInterval() {
+      if (intervalId == null) return;
+      window.clearInterval(intervalId);
+      intervalId = null;
+    }
+
+    function startInterval() {
+      stopInterval();
+      intervalId = window.setInterval(() => {
+        void runPoll();
+      }, POLL_MS);
+    }
+
+    function onVisible() {
       void runPoll();
-    }, POLL_MS);
+      startInterval();
+    }
+
+    function onHidden() {
+      stopInterval();
+      liveAbortRef.current?.abort();
+      liveAbortRef.current = null;
+    }
+
+    function onVisibility() {
+      if (document.visibilityState === "visible") onVisible();
+      else onHidden();
+    }
+
+    if (document.visibilityState === "visible") onVisible();
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+      stopInterval();
       liveAbortRef.current?.abort();
       liveAbortRef.current = null;
     };
@@ -251,13 +279,8 @@ export default function PackedApp() {
     >
       <TopBar
         demoMode={demoMode}
-        editPin={editPin}
         onDemo={enterDemo}
         onLive={enterLive}
-        onToggleEditPin={() => {
-          setEditPin((v) => !v);
-          setSheetExpanded(true);
-        }}
       />
 
       <div className="map-stage">
@@ -278,10 +301,8 @@ export default function PackedApp() {
           location={liveLoc}
           selectedId={selectedId}
           state={state}
-          recommendation={recommendation}
           bestId={bestId}
           demoMode={demoMode}
-          editPin={editPin}
           sheetExpanded={sheetExpanded}
           meta={meta}
           liveLoading={liveLoading}
@@ -289,7 +310,6 @@ export default function PackedApp() {
           onCollapse={() => setSheetExpanded(false)}
           onExpand={() => setSheetExpanded(true)}
           onSlider={onSlider}
-          onPlaceChange={setPlace}
         />
       </div>
     </div>

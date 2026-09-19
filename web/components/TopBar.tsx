@@ -1,23 +1,19 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { MapPin, Moon, MoreVertical, Radio, Sun } from "lucide-react";
+import { Moon, MoreVertical, Radio, Sun } from "lucide-react";
 import { applyTheme, resolveTheme, toggleTheme, type Theme } from "@/lib/theme";
 
 type Props = {
   demoMode: boolean;
-  editPin: boolean;
   onDemo: () => void;
   onLive: () => void;
-  onToggleEditPin: () => void;
 };
 
 export default function TopBar({
   demoMode,
-  editPin,
   onDemo,
   onLive,
-  onToggleEditPin,
 }: Props) {
   const [theme, setTheme] = useState<Theme>("light");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -143,21 +139,6 @@ export default function TopBar({
               <Radio size={14} aria-hidden />
               Live
             </button>
-            {demoMode ? (
-            <button
-              type="button"
-              role="menuitem"
-              className={`overflow-item${editPin ? " is-active" : ""}`}
-              aria-pressed={editPin}
-              onClick={() => {
-                onToggleEditPin();
-                setMenuOpen(false);
-              }}
-            >
-              <MapPin size={14} aria-hidden />
-              {editPin ? "Hide pin editor" : "Edit pin"}
-            </button>
-            ) : null}
           </div>
         ) : null}
       </div>
