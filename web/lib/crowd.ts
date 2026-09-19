@@ -66,14 +66,26 @@ export function statusFromDensity(density: number | null): CrowdStatus {
   return { key: "busy", label: "Busy" };
 }
 
+export function trendDirection(
+  current: number | null,
+  previous: number | null,
+): "up" | "down" | "flat" | "none" {
+  if (current == null || previous == null) return "none";
+  if (current > previous + 2) return "up";
+  if (current < previous - 2) return "down";
+  return "flat";
+}
+
+/** @deprecated use trendDirection */
 export function trendArrow(
   current: number | null,
   previous: number | null,
 ): string {
-  if (current == null || previous == null) return "–";
-  if (current > previous + 2) return "↑";
-  if (current < previous - 2) return "↓";
-  return "→";
+  const d = trendDirection(current, previous);
+  if (d === "up") return "↑";
+  if (d === "down") return "↓";
+  if (d === "flat") return "→";
+  return "–";
 }
 
 export function buildRecommendation(
