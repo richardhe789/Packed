@@ -9,6 +9,7 @@
  */
 
 #include <Arduino.h>
+#include <math.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
@@ -18,11 +19,29 @@
 #include "config.h"
 #include "location_config.generated.h"
 
-// --- Tunable density thresholds (edit live at venue) ---
-static const float RSSI_THRESHOLD = 10.0f;    // % drop required
-static const float PACKET_THRESHOLD = 15.0f;  // % rise required
+// --- Tunable density scoring (edit live at venue) ---
+// combined_score = packet_z - rssi_z. Climb when packets are above the empty-room
+// baseline and/or RSSI is weaker (more negative) than baseline.
+// Step 0 (unlabeled readings): dining_hall quiet cluster often moves together
+// window-to-window (noise — why this is not a rolling % delta). Goodwin levels
+// corr(avg_rssi, packet_count) ≈ -0.58, so keep packet_z - rssi_z. Flip the
+// minus to a plus if a labeled walk shows RSSI strengthening with people.
+static const float SCORE_THRESHOLD = 1.0f;
 static const int STEP_UP = 10;
 static const int STEP_DOWN = 5;
+static const float RSSI_STDDEV_EPS = 1.0f;      // dBm; avoid /0
+static const float PACKET_STDDEV_EPS = 50.0f;   // packets; avoid /0
+
+// Permanent empty-room floor (dining_hall_main quiet windows, ~30s).
+// After a new empty run, paste Serial "calibration done" numbers here and reflash.
+static const float EMPTY_RSSI_MEAN = -72.89f;
+static const float EMPTY_RSSI_STDDEV = 0.94f;
+static const float EMPTY_PACKET_MEAN = 4401.6f;
+static const float EMPTY_PACKET_STDDEV = 223.0f;
+
+#ifndef CALIBRATION_MS
+static const unsigned long CALIBRATION_MS = 5UL * 60UL * 1000UL;
+#endif
 
 // Window length (ms). Use 5 min for demo; shorten for faster testing via SHORT_WINDOWS.
 #ifndef SHORT_WINDOWS
@@ -58,10 +77,24 @@ static portMUX_TYPE sniffMux = portMUX_INITIALIZER_UNLOCKED;
 static volatile int64_t rssiSum = 0;
 static volatile uint32_t packetCount = 0;
 
-static float prevAvgRssi = 0.0f;
-static uint32_t prevPacketCount = 0;
-static bool hasPrevWindow = false;
 static int density = 0;
+
+// Empty-room baseline from an explicit calibration run (not the live window cycle).
+struct RunningStats {
+  uint32_t n = 0;
+  double mean = 0.0;
+  double m2 = 0.0;
+};
+
+static bool calibrating = false;
+static bool calibrated = false;
+static unsigned long calibStartMs = 0;
+static RunningStats rssiCal;
+static RunningStats packetCal;
+static float rssi_baseline_mean = 0.0f;
+static float rssi_baseline_stddev = RSSI_STDDEV_EPS;
+static float packet_baseline_mean = 0.0f;
+static float packet_baseline_stddev = PACKET_STDDEV_EPS;
 
 static unsigned long windowStartMs = 0;
 static bool sniffing = false;
@@ -176,11 +209,77 @@ static void snapshotWindow(int64_t *outRssiSum, uint32_t *outPackets) {
   portEXIT_CRITICAL(&sniffMux);
 }
 
-static float pctChange(float current, float previous) {
-  if (previous == 0.0f) {
-    return current == 0.0f ? 0.0f : 100.0f;
+static void statsAdd(RunningStats *s, double x) {
+  s->n++;
+  const double d = x - s->mean;
+  s->mean += d / static_cast<double>(s->n);
+  s->m2 += d * (x - s->mean);
+}
+
+static float statsStddev(const RunningStats *s, float eps) {
+  if (s->n < 2) {
+    return eps;
   }
-  return ((current - previous) / previous) * 100.0f;
+  const double var = s->m2 / static_cast<double>(s->n - 1);
+  const float sd = static_cast<float>(sqrt(var));
+  return sd < eps ? eps : sd;
+}
+
+static void applyHardcodedBaseline() {
+  calibrating = false;
+  calibrated = true;
+  rssi_baseline_mean = EMPTY_RSSI_MEAN;
+  rssi_baseline_stddev = EMPTY_RSSI_STDDEV < RSSI_STDDEV_EPS ? RSSI_STDDEV_EPS
+                                                             : EMPTY_RSSI_STDDEV;
+  packet_baseline_mean = EMPTY_PACKET_MEAN;
+  packet_baseline_stddev = EMPTY_PACKET_STDDEV < PACKET_STDDEV_EPS
+                               ? PACKET_STDDEV_EPS
+                               : EMPTY_PACKET_STDDEV;
+  Serial.println(F("[cal] using hardcoded empty-room baseline"));
+  Serial.printf("  rssi_baseline_mean=%.2f  rssi_baseline_stddev=%.2f\n",
+                rssi_baseline_mean, rssi_baseline_stddev);
+  Serial.printf("  packet_baseline_mean=%.1f  packet_baseline_stddev=%.1f\n",
+                packet_baseline_mean, packet_baseline_stddev);
+  Serial.println(F("[cal] send 'c' to recapture empty (RAM only until you paste into EMPTY_*)"));
+}
+
+static void beginCalibration() {
+  calibrating = true;
+  calibrated = false;
+  calibStartMs = millis();
+  rssiCal = RunningStats{};
+  packetCal = RunningStats{};
+  density = 0;
+  resetWindowAccumulators();
+  windowStartMs = millis();
+  Serial.printf("[cal] empty-room calibration started (%lu ms). Keep the space empty.\n",
+                CALIBRATION_MS);
+  Serial.println(F("[cal] send 'c' over serial to restart calibration"));
+}
+
+static void finishCalibration() {
+  rssi_baseline_mean = static_cast<float>(rssiCal.mean);
+  rssi_baseline_stddev = statsStddev(&rssiCal, RSSI_STDDEV_EPS);
+  packet_baseline_mean = static_cast<float>(packetCal.mean);
+  packet_baseline_stddev = statsStddev(&packetCal, PACKET_STDDEV_EPS);
+  calibrating = false;
+  calibrated = true;
+  Serial.println(F("---------- calibration done ----------"));
+  Serial.printf("  rssi_baseline_mean=%.2f  rssi_baseline_stddev=%.2f  n=%u\n",
+                rssi_baseline_mean, rssi_baseline_stddev, rssiCal.n);
+  Serial.printf("  packet_baseline_mean=%.1f  packet_baseline_stddev=%.1f\n",
+                packet_baseline_mean, packet_baseline_stddev);
+  Serial.println(F("  paste into EMPTY_* in main.cpp to keep this after reboot"));
+  Serial.println(F("--------------------------------------"));
+}
+
+static void pollSerialCommands() {
+  while (Serial.available() > 0) {
+    const char c = static_cast<char>(Serial.read());
+    if (c == 'c' || c == 'C') {
+      beginCalibration();
+    }
+  }
 }
 
 static bool pushReadingToSupabase(float avgRssi, uint32_t packets, int dens) {
@@ -238,35 +337,39 @@ static void processWindow() {
     avgRssi = static_cast<float>(sum) / static_cast<float>(packets);
   }
 
-  float rssiDeltaPct = 0.0f;
-  float packetDeltaPct = 0.0f;
+  float rssi_z = 0.0f;
+  float packet_z = 0.0f;
+  float combined_score = 0.0f;
 
-  if (hasPrevWindow) {
-    rssiDeltaPct = pctChange(avgRssi, prevAvgRssi);
-    packetDeltaPct = pctChange(static_cast<float>(packets),
-                               static_cast<float>(prevPacketCount));
-
-    const bool rssiDropped = rssiDeltaPct <= -RSSI_THRESHOLD;
-    const bool packetsRose = packetDeltaPct >= PACKET_THRESHOLD;
-
-    if (rssiDropped && packetsRose) {
+  if (packets == 0) {
+    Serial.println(F("[window] zero packets — skip score/calibration sample"));
+  } else if (calibrating) {
+    statsAdd(&rssiCal, avgRssi);
+    statsAdd(&packetCal, static_cast<double>(packets));
+    Serial.println(F("---------- cal window ----------"));
+    Serial.printf("  avg_rssi=%.2f  packet_count=%u  n=%u\n", avgRssi, packets, rssiCal.n);
+    Serial.println(F("--------------------------------"));
+    if ((millis() - calibStartMs) >= CALIBRATION_MS && rssiCal.n >= 1) {
+      finishCalibration();
+    }
+  } else if (calibrated) {
+    rssi_z = (avgRssi - rssi_baseline_mean) / rssi_baseline_stddev;
+    packet_z = (static_cast<float>(packets) - packet_baseline_mean) / packet_baseline_stddev;
+    combined_score = packet_z - rssi_z;
+    if (combined_score >= SCORE_THRESHOLD) {
       density = min(100, density + STEP_UP);
     } else {
       density = max(0, density - STEP_DOWN);
     }
+    Serial.println(F("---------- window ----------"));
+    Serial.printf("  avg_rssi=%.2f  packet_count=%u\n", avgRssi, packets);
+    Serial.printf("  rssi_z=%.2f  packet_z=%.2f  combined_score=%.2f  density=%d\n",
+                  rssi_z, packet_z, combined_score, density);
+    Serial.println(F("----------------------------"));
   } else {
-    Serial.println(F("[window] first window — establishing baseline, density unchanged"));
+    Serial.println(F("[window] not calibrated — send 'c' (density unchanged)"));
+    Serial.printf("  avg_rssi=%.2f  packet_count=%u  density=%d\n", avgRssi, packets, density);
   }
-
-  Serial.println(F("---------- window ----------"));
-  Serial.printf("  avg_rssi=%.2f  packet_count=%u\n", avgRssi, packets);
-  Serial.printf("  rssi_%%Δ=%.1f  packet_%%Δ=%.1f\n", rssiDeltaPct, packetDeltaPct);
-  Serial.printf("  density=%d\n", density);
-  Serial.println(F("----------------------------"));
-
-  prevAvgRssi = avgRssi;
-  prevPacketCount = packets;
-  hasPrevWindow = true;
 
   // Radio: pause sniff → POST → resume (single-radio coexistence)
   pauseSniffForUpload();
@@ -281,6 +384,12 @@ void setup() {
   Serial.println();
   Serial.println(F("=== WiFi Ambient Crowd Density Sensor ==="));
   Serial.println(F("No MAC tracking. Aggregate RSSI + packet count only."));
+  // ponytail: one check that the z-score combine cannot silently invert.
+  {
+    const float combined = ((6000.0f - 4400.0f) / 200.0f) - ((-75.0f - (-72.5f)) / 1.0f);
+    Serial.printf("[selfcheck] combined_score=%.1f (%s)\n", combined,
+                  combined >= SCORE_THRESHOLD ? "ok" : "FAIL");
+  }
 
   if (!hasUsableConfig()) {
     Serial.println(F("[fatal] Invalid local config.h. Set hotspot credentials, the"));
@@ -312,12 +421,14 @@ void setup() {
 
   resetWindowAccumulators();
   startSniffing();
-  windowStartMs = millis();
   Serial.printf("[ready] window=%lu ms  location=%s\n", WINDOW_MS, LOCATION);
-  Serial.println(F("[ready] Tunables: RSSI_THRESHOLD, PACKET_THRESHOLD, STEP_UP, STEP_DOWN"));
+  Serial.println(F("[ready] Tunables: SCORE_THRESHOLD, STEP_UP, STEP_DOWN"));
+  windowStartMs = millis();
+  applyHardcodedBaseline();
 }
 
 void loop() {
+  pollSerialCommands();
   // Keep STA alive when possible; if sniff channel differs from AP, association
   // may drop until pauseSniffForUpload reconnects — that is expected.
   if (millis() - windowStartMs >= WINDOW_MS) {

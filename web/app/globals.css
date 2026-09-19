@@ -218,7 +218,9 @@ body {
   color: var(--color-ink);
   cursor: pointer;
   flex-shrink: 0;
-  box-shadow: 0 3px 0 0 var(--color-rule), 0 4px 10px -3px var(--btn-cast-idle);
+  box-shadow:
+    0 3px 0 0 var(--color-rule),
+    0 4px 10px -3px var(--btn-cast-idle);
   transform: translateY(0);
   transition:
     transform var(--dur-short) var(--ease-press),
@@ -228,7 +230,9 @@ body {
 
 .theme-switch:active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--color-rule), 0 2px 6px -2px var(--btn-cast-idle);
+  box-shadow:
+    0 1px 0 0 var(--color-rule),
+    0 2px 6px -2px var(--btn-cast-idle);
   transition-duration: 70ms;
 }
 
@@ -238,7 +242,11 @@ body {
 }
 
 .theme-switch.is-dark {
-  background: color-mix(in oklch, var(--color-accent) 35%, var(--color-paper-2));
+  background: color-mix(
+    in oklch,
+    var(--color-accent) 35%,
+    var(--color-paper-2)
+  );
 }
 
 .theme-switch-track {
@@ -308,7 +316,9 @@ body {
   color: var(--btn-ink);
   background: var(--btn-face);
   cursor: pointer;
-  box-shadow: 0 3px 0 0 var(--btn-edge), 0 4px 10px -3px var(--btn-cast);
+  box-shadow:
+    0 3px 0 0 var(--btn-edge),
+    0 4px 10px -3px var(--btn-cast);
   transform: translateY(0);
   transition:
     transform var(--dur-short) var(--ease-press),
@@ -319,7 +329,9 @@ body {
 .mode-btn:active,
 .mode-btn.is-active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--btn-edge), 0 2px 6px -2px var(--btn-cast);
+  box-shadow:
+    0 1px 0 0 var(--btn-edge),
+    0 2px 6px -2px var(--btn-cast);
   transition-duration: 70ms;
 }
 
@@ -343,7 +355,9 @@ body {
 
 .mode-btn.active:active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--btn-edge), 0 2px 6px -2px var(--btn-cast);
+  box-shadow:
+    0 1px 0 0 var(--btn-edge),
+    0 2px 6px -2px var(--btn-cast);
 }
 
 .map-stage {
@@ -449,7 +463,11 @@ body {
   top: 0;
   bottom: 0;
   width: min(14vw, 120px);
-  background: linear-gradient(90deg, color-mix(in oklch, var(--color-paper) 55%, transparent), transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--color-paper) 55%, transparent),
+    transparent
+  );
 }
 
 .map-fade-right {
@@ -457,7 +475,11 @@ body {
   top: 0;
   bottom: 0;
   width: min(18vw, 160px);
-  background: linear-gradient(270deg, color-mix(in oklch, var(--color-paper) 50%, transparent), transparent);
+  background: linear-gradient(
+    270deg,
+    color-mix(in oklch, var(--color-paper) 50%, transparent),
+    transparent
+  );
 }
 
 .map-fade-top {
@@ -465,7 +487,11 @@ body {
   right: 0;
   top: 0;
   height: 48px;
-  background: linear-gradient(180deg, color-mix(in oklch, var(--color-paper) 40%, transparent), transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-paper) 40%, transparent),
+    transparent
+  );
 }
 
 .map-fade-bottom {
@@ -473,7 +499,11 @@ body {
   right: 0;
   bottom: 0;
   height: 64px;
-  background: linear-gradient(0deg, color-mix(in oklch, var(--color-paper) 45%, transparent), transparent);
+  background: linear-gradient(
+    0deg,
+    color-mix(in oklch, var(--color-paper) 45%, transparent),
+    transparent
+  );
 }
 
 .geo-pin {
@@ -579,7 +609,9 @@ body {
 }
 
 .building-footprint {
-  transition: fill var(--dur-med) var(--ease-out), stroke var(--dur-med) var(--ease-out);
+  transition:
+    fill var(--dur-med) var(--ease-out),
+    stroke var(--dur-med) var(--ease-out);
 }
 
 .map-pin {
@@ -721,7 +753,11 @@ body {
 
 .sensor-chip.live {
   color: var(--color-ink);
-  background: color-mix(in oklch, var(--color-accent-2) 18%, var(--color-paper));
+  background: color-mix(
+    in oklch,
+    var(--color-accent-2) 18%,
+    var(--color-paper)
+  );
   border-color: var(--color-accent-2);
 }
 
@@ -1014,17 +1050,23 @@ body {
 
   .theme-switch:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 0 0 var(--color-rule), 0 10px 18px -4px var(--btn-cast-idle);
+    box-shadow:
+      0 5px 0 0 var(--color-rule),
+      0 10px 18px -4px var(--btn-cast-idle);
   }
 
   .mode-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 0 0 var(--btn-edge), 0 10px 18px -4px var(--btn-cast);
+    box-shadow:
+      0 5px 0 0 var(--btn-edge),
+      0 10px 18px -4px var(--btn-cast);
   }
 
   .mode-btn.active:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 0 0 var(--btn-edge), 0 12px 20px -4px var(--btn-cast);
+    box-shadow:
+      0 5px 0 0 var(--btn-edge),
+      0 12px 20px -4px var(--btn-cast);
   }
 
   .icon-btn:hover {
@@ -1080,7 +1122,9 @@ body {
 @media (max-width: 51.1875rem) {
   .map-shell {
     --topbar-h: calc(3.5rem + env(safe-area-inset-top, 0px));
-    --map-bottom-pad: calc(var(--sheet-peek-h) + env(safe-area-inset-bottom, 0px));
+    --map-bottom-pad: calc(
+      var(--sheet-peek-h) + env(safe-area-inset-bottom, 0px)
+    );
     --page-gutter: var(--space-sm);
   }
 
