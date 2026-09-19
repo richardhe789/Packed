@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   LOCATIONS,
   POLL_MS,
+  SENSOR_LOCATION,
   buildRecommendation,
   emptyState,
   quietestLocationId,
@@ -40,7 +41,7 @@ export default function PackedApp() {
   );
   const [liveLoading, setLiveLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() =>
-    initialDemo ? "dining_hall_west" : "dining_hall_main",
+    initialDemo ? "dining_hall_west" : SENSOR_LOCATION.id,
   );
 
   const syncUrl = useCallback(
@@ -109,7 +110,7 @@ export default function PackedApp() {
     setState(emptyState());
     setMeta("Live · fetching…");
     setLiveLoading(true);
-    setSelectedId("dining_hall_main");
+    setSelectedId(SENSOR_LOCATION.id);
     syncUrl(false);
   }, [syncUrl]);
 

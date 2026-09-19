@@ -33,11 +33,12 @@ export const CAMPUS_VIEW = {
 
 export const LOCATIONS: LocationDef[] = [
   {
-    id: "dining_hall_main",
-    label: "Dietrick Hall (D2)",
-    shortLabel: "Dietrick",
+    id: SENSOR_LOCATION.id,
+    label: SENSOR_LOCATION.label,
+    shortLabel: SENSOR_LOCATION.label,
     liveSensor: true,
-    coords: { lat: 37.22455, lng: -80.41895 },
+    // Manual Google Maps coordinate from the shared location configuration.
+    coords: { lat: SENSOR_LOCATION.latitude, lng: SENSOR_LOCATION.longitude },
   },
   {
     id: "dining_hall_west",
@@ -90,7 +91,7 @@ export function emptyState(): Record<string, ReadingState> {
 /** Pass `at` only from client code. Omit on SSR so server/client HTML matches. */
 export function seedDemoState(at: string | null = null): Record<string, ReadingState> {
   const samples: Record<string, number> = {
-    dining_hall_main: 78,
+    [SENSOR_LOCATION.id]: 78,
     dining_hall_west: 22,
     library_lobby: 45,
     student_union: 62,
@@ -198,3 +199,5 @@ export function wantsDemoFromSearch(search: string): boolean {
 export function getLocation(id: string): LocationDef | undefined {
   return LOCATIONS.find((l) => l.id === id);
 }
+export { SENSOR_LOCATION } from "@/lib/location.generated";
+import { SENSOR_LOCATION } from "@/lib/location.generated";

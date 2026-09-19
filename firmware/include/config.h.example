@@ -23,6 +23,5 @@
 #define SUPABASE_API_KEY "YOUR_SUPABASE_ANON_KEY"
 #endif
 
-#ifndef LOCATION_ID
-#define LOCATION_ID "dining_hall_main"
-#endif
+// Location is intentionally not configured here. Edit ../../location.config.json
+// (ID, label, latitude, longitude) before building; PlatformIO generates LOCATION_ID.

@@ -10,8 +10,10 @@ web/out/
 .vscode/launch.json
 .vscode/ipch
 firmware/include/config.h
+firmware/include/location_config.generated.h
 .env
 .env.*
 !.env.example
 !web/.env.example
+web/.env.local
 *.pem

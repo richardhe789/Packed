@@ -21,12 +21,14 @@ create policy "Public can read crowd readings"
   on public.readings for select to anon
   using (true);
 
--- The ESP32 only inserts; it cannot change or delete readings.
+-- The ESP32 only inserts; it cannot change or delete readings. This accepts
+-- location IDs from location.config.json (lowercase letters, numbers, underscores),
+-- so moving the sensor never requires a secret key or an RLS policy edit.
 drop policy if exists "Public can insert crowd readings" on public.readings;
 create policy "Public can insert crowd readings"
   on public.readings for insert to anon
   with check (
-    location = 'dining_hall_main'
+    location ~ '^[a-z][a-z0-9_]{0,63}$'
     and density between 0 and 100
     and packet_count >= 0
   );

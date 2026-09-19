@@ -22,6 +22,8 @@ Ambient WiFi frames
 | `web/` | Next.js App Router UI (Vercel root) |
 | `firmware/include/config.h.example` | Template for WiFi + Supabase secrets |
 | `web/.env.example` | Template for Next.js Supabase env vars |
+| [`location.config.json`](location.config.json) | The one manual ESP32/dashboard testing location |
+| [`LOCATION.md`](LOCATION.md) | Move-the-sensor instructions |
 | [`NEXT_STEPS.md`](NEXT_STEPS.md) | Post-hackathon roadmap (sim data, multi-campus, etc.) |
 
 ## Phase checklist
@@ -46,7 +48,8 @@ Ambient WiFi frames
 
    - `WIFI_SSID` / `WIFI_PASSWORD` — **phone hotspot** (not campus WiFi)
    - `SUPABASE_URL` / `SUPABASE_API_KEY` — project URL + **anon** key
-   - Optional: `LOCATION_ID` (default `dining_hall_main`)
+   - The testing location is not a secret: edit only root `location.config.json`
+     (default ID: `dining_hall_main`).
 
 3. Open `firmware/` in PlatformIO, build & upload to the ESP32.
 4. Open Serial Monitor at **115200** baud.
@@ -79,7 +82,8 @@ For faster bench testing, use the `esp32dev_short` PlatformIO env (30s windows).
 
 1. In ignored `firmware/include/config.h`, set the phone hotspot SSID/password,
    `https://myjfbuathehfghagbnot.supabase.co`, the project's anon key, and
-   `LOCATION_ID` = `dining_hall_main`. Enable the hotspot before powering the
+   The manual location is in root `location.config.json` (default
+   `dining_hall_main`). Enable the hotspot before powering the
    board; choose 2.4 GHz if the phone offers a band setting.
 2. Connect a data-capable USB cable. From `firmware/`, upload a short test or
    the standard five-minute build:
@@ -136,8 +140,8 @@ Project: **Packed** (`myjfbuathehfghagbnot`) — rename the display name in the 
    web/.env.local               NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
    ```
 
-   Keep `LOCATION_ID` set to `dining_hall_main`; it is the dashboard's live
-   location and the location accepted by the insert policy.
+   The dashboard and firmware both take their manual location from root
+   `location.config.json`; it defaults to `dining_hall_main`.
 
 Table `public.readings`:
 
@@ -164,7 +168,7 @@ curl -X POST "https://myjfbuathehfghagbnot.supabase.co/rest/v1/readings" \
 ```
 
 After the request returns 2xx, open the dashboard with `?live=1`. It queries
-the newest `readings` rows for `location=dining_hall_main` every 30 seconds.
+the newest rows for the ID in `location.config.json` every 30 seconds.
 
 ## Web UI (Next.js)
 
@@ -180,7 +184,7 @@ pnpm dev
 Open [http://localhost:3000](http://localhost:3000) (Demo by default). Use `?demo=1` / `?live=1` or the **Demo** / **Live** toggle.
 
 - **Demo:** seeded crowd levels + sliders to scrub density and watch the recommendation update (no ESP32 needed).
-- **Live:** polls Supabase for `dining_hall_main` every 30s.
+- **Live:** polls Supabase for the ID in `location.config.json` every 30s.
 - Status: **0–33 Quiet**, **34–66 Moderate**, **67–100 Busy**.
 
 ### Switching from npm

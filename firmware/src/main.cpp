@@ -16,6 +16,7 @@
 #include <ArduinoJson.h>
 
 #include "config.h"
+#include "location_config.generated.h"
 
 // --- Tunable density thresholds (edit live at venue) ---
 static const float RSSI_THRESHOLD = 10.0f;    // % drop required
