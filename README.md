@@ -157,6 +157,8 @@ Ambient WiFi frames
 
 ## Firmware
 
+PlatformIO may regenerate `compile_commands.json` locally; it is gitignored.
+
 1. Install PlatformIO (VS Code / Cursor extension is fine).
 2. Copy `config.h.example` → `config.h` (gitignored).
 3. Fill in hotspot WiFi, `SUPABASE_URL` / anon `SUPABASE_API_KEY`, and `DEVICE_INGEST_KEY` (must match the `ingest-reading` Edge Function secret). Optional: `LOCATION_ID`, `INGEST_PATH`.

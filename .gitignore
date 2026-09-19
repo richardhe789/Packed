@@ -10,6 +10,7 @@ web/out/
 .vscode/launch.json
 .vscode/ipch
 firmware/include/config.h
+firmware/compile_commands.json
 .env
 .env.*
 !.env.example
