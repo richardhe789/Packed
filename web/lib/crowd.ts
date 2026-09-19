@@ -1,7 +1,10 @@
 export type LocationDef = {
   id: string;
   label: string;
+  shortLabel: string;
   liveSensor: boolean;
+  /** WGS84 — Virginia Tech Blacksburg campus */
+  coords: { lat: number; lng: number };
 };
 
 export type ReadingState = {
@@ -21,10 +24,56 @@ export type Recommendation = {
   tone: "go" | "neutral";
 };
 
+/** Temporary focus: Virginia Tech, Blacksburg (approx building centers). */
+export const CAMPUS_VIEW = {
+  longitude: -80.422,
+  latitude: 37.2278,
+  zoom: 15.35,
+} as const;
+
 export const LOCATIONS: LocationDef[] = [
-  { id: "dining_hall_main", label: "Dining Hall (Main)", liveSensor: true },
-  { id: "dining_hall_west", label: "Dining Hall (West)", liveSensor: false },
-  { id: "library_lobby", label: "Library Lobby", liveSensor: false },
+  {
+    id: "dining_hall_main",
+    label: "Dietrick Hall (D2)",
+    shortLabel: "Dietrick",
+    liveSensor: true,
+    coords: { lat: 37.22455, lng: -80.41895 },
+  },
+  {
+    id: "dining_hall_west",
+    label: "West End Market",
+    shortLabel: "West End",
+    liveSensor: false,
+    coords: { lat: 37.2219, lng: -80.4243 },
+  },
+  {
+    id: "library_lobby",
+    label: "Newman Library",
+    shortLabel: "Newman",
+    liveSensor: false,
+    coords: { lat: 37.22905, lng: -80.41935 },
+  },
+  {
+    id: "student_union",
+    label: "Squires Student Center",
+    shortLabel: "Squires",
+    liveSensor: false,
+    coords: { lat: 37.22955, lng: -80.41795 },
+  },
+  {
+    id: "rec_center",
+    label: "McComas Hall",
+    shortLabel: "McComas",
+    liveSensor: false,
+    coords: { lat: 37.2214, lng: -80.41875 },
+  },
+  {
+    id: "science_quad",
+    label: "Derring Hall",
+    shortLabel: "Derring",
+    liveSensor: false,
+    coords: { lat: 37.23015, lng: -80.4254 },
+  },
 ];
 
 export const POLL_MS = 30_000;
@@ -44,6 +93,9 @@ export function seedDemoState(at: string | null = null): Record<string, ReadingS
     dining_hall_main: 78,
     dining_hall_west: 22,
     library_lobby: 45,
+    student_union: 62,
+    rec_center: 35,
+    science_quad: 18,
   };
   const state: Record<string, ReadingState> = {};
   for (const loc of LOCATIONS) {
@@ -76,16 +128,19 @@ export function trendDirection(
   return "flat";
 }
 
-/** @deprecated use trendDirection */
-export function trendArrow(
-  current: number | null,
-  previous: number | null,
-): string {
-  const d = trendDirection(current, previous);
-  if (d === "up") return "↑";
-  if (d === "down") return "↓";
-  if (d === "flat") return "→";
-  return "–";
+export function quietestLocationId(
+  state: Record<string, ReadingState>,
+): string | null {
+  let best: string | null = null;
+  let bestD = Infinity;
+  for (const loc of LOCATIONS) {
+    const d = state[loc.id].density;
+    if (d != null && d < bestD) {
+      bestD = d;
+      best = loc.id;
+    }
+  }
+  return best;
 }
 
 export function buildRecommendation(
@@ -103,7 +158,7 @@ export function buildRecommendation(
     return {
       text: "Waiting for crowd data…",
       detail: demoMode
-        ? "Use the sliders below to simulate busyness."
+        ? "Tap a building or scrub density in the panel."
         : "ESP32 has not posted a reading yet.",
       tone: "neutral",
     };
@@ -120,15 +175,15 @@ export function buildRecommendation(
     return {
       text: "Anywhere looks similar right now",
       detail:
-        "Crowd levels are close across locations — pick what’s convenient.",
+        "Crowd levels are close across campus — pick what’s convenient.",
       tone: "neutral",
     };
   }
 
   const qStatus = statusFromDensity(quietest.density).label;
   return {
-    text: `Go to ${quietest.loc.label}`,
-    detail: `Quieter right now (${qStatus}) — skip the busier line at ${busiest.loc.label}.`,
+    text: `Go to ${quietest.loc.shortLabel}`,
+    detail: `Quieter right now (${qStatus}) — skip the busier spot at ${busiest.loc.shortLabel}.`,
     tone: "go",
   };
 }
@@ -138,4 +193,8 @@ export function wantsDemoFromSearch(search: string): boolean {
   if (q.get("demo") === "1" || q.get("demo") === "true") return true;
   if (q.get("live") === "1" || q.get("live") === "true") return false;
   return true;
+}
+
+export function getLocation(id: string): LocationDef | undefined {
+  return LOCATIONS.find((l) => l.id === id);
 }
