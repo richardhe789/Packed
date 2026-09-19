@@ -10,12 +10,13 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   CAMPUS_VIEW,
-  LOCATIONS,
   statusFromDensity,
+  type LocationDef,
   type ReadingState,
 } from "@/lib/crowd";
 
 type Props = {
+  location: LocationDef;
   state: Record<string, ReadingState>;
   selectedId: string | null;
   bestId: string | null;
@@ -37,6 +38,7 @@ function ensureMapLibreWorker() {
 }
 
 export default function CampusMap({
+  location,
   state,
   selectedId,
   bestId,
@@ -65,7 +67,7 @@ export default function CampusMap({
     const map = new MapLibreMap({
       container: el,
       style: OPENFREEMAP_STYLE_URL,
-      center: [CAMPUS_VIEW.longitude, CAMPUS_VIEW.latitude],
+      center: [location.coords.lng, location.coords.lat],
       zoom: CAMPUS_VIEW.zoom,
       attributionControl: { compact: true },
     });
@@ -132,10 +134,8 @@ export default function CampusMap({
 
     const project = () => {
       const next: PinScreen[] = [];
-      for (const loc of LOCATIONS) {
-        const p = map.project([loc.coords.lng, loc.coords.lat]);
-        next.push({ id: loc.id, x: p.x, y: p.y });
-      }
+      const p = map.project([location.coords.lng, location.coords.lat]);
+      next.push({ id: location.id, x: p.x, y: p.y });
       setPins(next);
     };
 
@@ -149,15 +149,24 @@ export default function CampusMap({
       map.off("zoom", project);
       map.off("resize", project);
     };
-  }, [mapEpoch]);
+  }, [mapEpoch, location.coords.lat, location.coords.lng, location.id]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapEpoch === 0) return;
+    map.flyTo({
+      center: [location.coords.lng, location.coords.lat],
+      duration: 450,
+    });
+  }, [mapEpoch, location.coords.lat, location.coords.lng]);
 
   return (
     <div className="map-canvas">
       <div ref={containerRef} className="map-container" />
 
-      <div className="map-pins" aria-label="Campus buildings">
+      <div className="map-pins" aria-label="Sensor location">
         {pins.map((pin) => {
-          const loc = LOCATIONS.find((l) => l.id === pin.id);
+          const loc = pin.id === location.id ? location : null;
           if (!loc) return null;
           const reading = state[loc.id];
           const crowd = statusFromDensity(reading?.density ?? null);

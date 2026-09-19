@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="Detail panel screenshot placeholder">
-  <rect width="960" height="540" fill="#f4f4f5"/>
-  <rect x="280" y="48" width="400" height="444" rx="20" fill="#fff" stroke="#e4e4e7"/>
-  <text x="312" y="108" fill="#111" font-family="ui-sans-serif, system-ui, sans-serif" font-size="24" font-weight="700">Dietrick Hall</text>
-  <text x="312" y="148" fill="#71717a" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16">Placeholder detail panel</text>
-  <rect x="312" y="188" width="336" height="72" rx="12" fill="#dcfce7"/>
-  <text x="336" y="232" fill="#166534" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="600">Quiet</text>
-</svg>

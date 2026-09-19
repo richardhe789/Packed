@@ -5,13 +5,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   LOCATIONS,
+  PLACE_STORAGE_KEY,
   POLL_MS,
   SENSOR_LOCATION,
   buildRecommendation,
   emptyState,
+  locationFromPlace,
+  parsePlaceFields,
+  placeFromSensor,
   quietestLocationId,
   seedDemoState,
   wantsDemoFromSearch,
+  type PlaceFields,
   type ReadingState,
 } from "@/lib/crowd";
 import { fetchLatestReadings } from "@/lib/supabase";
@@ -37,18 +42,20 @@ export default function PackedApp() {
   const search = searchParams.toString() ? `?${searchParams.toString()}` : "";
 
   const initialDemo = wantsDemoFromSearch(search);
+  const [place, setPlace] = useState<PlaceFields>(placeFromSensor);
+  const liveLoc = useMemo(() => locationFromPlace(place), [place]);
   const [demoMode, setDemoMode] = useState(initialDemo);
   const [state, setState] = useState<Record<string, ReadingState>>(() =>
     initialDemo ? seedDemoState() : emptyState(),
   );
   const [meta, setMeta] = useState(() =>
     initialDemo
-      ? "Demo · tap a building on the VT map · scrub density in the panel"
+      ? "Demo · one sensor pin · scrub density in the panel"
       : "Live · fetching…",
   );
   const [liveLoading, setLiveLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(() =>
-    initialDemo ? "dining_hall_west" : SENSOR_LOCATION.id,
+  const [selectedId, setSelectedId] = useState<string | null>(
+    SENSOR_LOCATION.id,
   );
 
   const liveGenerationRef = useRef(0);
@@ -75,8 +82,8 @@ export default function PackedApp() {
     setDemoMode(true);
     setLiveLoading(false);
     setState(seeded);
-    setMeta("Demo · tap a building · scrub density in the panel");
-    setSelectedId(quietestLocationId(seeded) ?? "dining_hall_west");
+    setMeta("Demo · one sensor pin · scrub density in the panel");
+    setSelectedId(SENSOR_LOCATION.id);
     syncUrl(true);
   }, [syncUrl]);
 
@@ -88,6 +95,26 @@ export default function PackedApp() {
     setSelectedId(SENSOR_LOCATION.id);
     syncUrl(false);
   }, [syncUrl]);
+
+  const [placeReady, setPlaceReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(PLACE_STORAGE_KEY);
+      if (raw) {
+        const parsed = parsePlaceFields(JSON.parse(raw) as unknown);
+        if (parsed) setPlace(parsed);
+      }
+    } catch {
+      // Ignore bad localStorage; location.config.json remains the default.
+    }
+    setPlaceReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!placeReady) return;
+    window.localStorage.setItem(PLACE_STORAGE_KEY, JSON.stringify(place));
+  }, [place, placeReady]);
 
   useEffect(() => {
     if (!demoMode) return;
@@ -138,6 +165,8 @@ export default function PackedApp() {
               density: latest ? latest.density : null,
               created_at: latest ? latest.created_at : null,
               prevDensity: previous ? previous.density : null,
+              avgRssi: latest ? latest.avg_rssi : null,
+              packetCount: latest ? latest.packet_count : null,
             };
           }
           return next;
@@ -188,6 +217,8 @@ export default function PackedApp() {
         prevDensity: prev[id].density,
         density: value,
         created_at: new Date().toISOString(),
+        avgRssi: prev[id].avgRssi,
+        packetCount: prev[id].packetCount,
       },
     }));
   }
@@ -196,13 +227,13 @@ export default function PackedApp() {
     <div className="map-shell">
       <TopBar
         demoMode={demoMode}
-        recommendation={recommendation}
         onDemo={enterDemo}
         onLive={enterLive}
       />
 
       <div className="map-stage">
         <CampusMap
+          location={liveLoc}
           state={state}
           selectedId={selectedId}
           bestId={bestId}
@@ -211,6 +242,7 @@ export default function PackedApp() {
         />
 
         <DetailPanel
+          location={liveLoc}
           selectedId={selectedId}
           state={state}
           recommendation={recommendation}
@@ -220,6 +252,7 @@ export default function PackedApp() {
           liveLoading={liveLoading}
           onClose={() => setSelectedId(null)}
           onSlider={onSlider}
+          onPlaceChange={setPlace}
         />
       </div>
     </div>

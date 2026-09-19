@@ -2,6 +2,8 @@ export type ReadingRow = {
   density: number;
   created_at: string;
   location: string;
+  avg_rssi: number | null;
+  packet_count: number | null;
 };
 
 export function getSupabaseConfig(): { url: string; anonKey: string } {
@@ -21,7 +23,10 @@ export async function fetchLatestReadings(
 ): Promise<{ latest: ReadingRow | null; previous: ReadingRow | null }> {
   const { url, anonKey } = getSupabaseConfig();
   const endpoint = new URL(`${url}/rest/v1/readings`);
-  endpoint.searchParams.set("select", "density,created_at,location");
+  endpoint.searchParams.set(
+    "select",
+    "density,created_at,location,avg_rssi,packet_count",
+  );
   endpoint.searchParams.set("location", `eq.${locationId}`);
   endpoint.searchParams.set("order", "created_at.desc");
   endpoint.searchParams.set("limit", "2");

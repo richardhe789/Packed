@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   title: "Packed — Dining Hall Status",
   description:
     "Should I go now? Live busyness from ambient WiFi density near dining halls.",
+  icons: {
+    icon: "/packed-logo.png",
+    apple: "/packed-logo.png",
+  },
 };
 
 export default function RootLayout({

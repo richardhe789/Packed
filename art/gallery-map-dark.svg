@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="Dark mode map screenshot placeholder">
-  <rect width="960" height="540" fill="#0a0a0a"/>
-  <rect x="24" y="24" width="912" height="492" rx="16" fill="#171717" stroke="#262626"/>
-  <text x="48" y="72" fill="#fafafa" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700">Campus map · dark</text>
-  <text x="48" y="108" fill="#a3a3a3" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16">Placeholder  dark theme</text>
-  <circle cx="280" cy="300" r="18" fill="#4ade80"/>
-  <circle cx="520" cy="240" r="18" fill="#facc15"/>
-  <circle cx="700" cy="360" r="18" fill="#f87171"/>
-</svg>

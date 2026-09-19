@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   LOCATIONS,
+  SENSOR_LOCATION,
   buildRecommendation,
   emptyState,
+  formatReadingAge,
+  locationFromPlace,
+  parsePlaceFields,
+  placeFromSensor,
   seedDemoState,
   statusFromDensity,
   trendDirection,
@@ -36,13 +41,60 @@ describe("trendDirection", () => {
   });
 });
 
+describe("LOCATIONS", () => {
+  it("is exactly the one pin from location.config.json", () => {
+    expect(LOCATIONS).toHaveLength(1);
+    expect(LOCATIONS[0]).toEqual(locationFromPlace(placeFromSensor()));
+    expect(LOCATIONS[0].id).toBe(SENSOR_LOCATION.id);
+    expect(LOCATIONS[0].liveSensor).toBe(true);
+  });
+});
+
+describe("parsePlaceFields", () => {
+  it("accepts a labeled lat/lng for the current sensor id and rejects junk", () => {
+    expect(
+      parsePlaceFields({
+        id: SENSOR_LOCATION.id,
+        label: "Goodwin Hall",
+        latitude: 37.2323,
+        longitude: -80.426,
+      }),
+    ).toEqual({
+      id: SENSOR_LOCATION.id,
+      label: "Goodwin Hall",
+      latitude: 37.2323,
+      longitude: -80.426,
+    });
+    expect(
+      parsePlaceFields({
+        label: "Goodwin Hall",
+        latitude: 37.2323,
+        longitude: -80.426,
+      }),
+    ).toBeNull();
+    expect(parsePlaceFields({ label: "x", latitude: 200, longitude: 0 })).toBeNull();
+    expect(parsePlaceFields(null)).toBeNull();
+  });
+});
+
+describe("formatReadingAge", () => {
+  const now = Date.parse("2020-01-01T00:01:00.000Z");
+
+  it("returns seconds, minutes, or hours ago", () => {
+    expect(formatReadingAge("2020-01-01T00:00:45.000Z", now)).toBe("15s ago");
+    expect(formatReadingAge("2020-01-01T00:00:00.000Z", now)).toBe("1m ago");
+    expect(formatReadingAge("2019-12-31T22:01:00.000Z", now)).toBe("2h ago");
+  });
+
+  it("returns null when timestamp is missing", () => {
+    expect(formatReadingAge(null, now)).toBeNull();
+  });
+});
+
 describe("seedDemoState", () => {
-  it("fills every location with density; dining_hall_main is 78", () => {
+  it("fills the one sensor location with density 62", () => {
     const state = seedDemoState("2020-01-01T00:00:00.000Z");
-    for (const loc of LOCATIONS) {
-      expect(state[loc.id].density).not.toBeNull();
-    }
-    expect(state.dining_hall_main.density).toBe(78);
+    expect(state[SENSOR_LOCATION.id].density).toBe(62);
   });
 });
 
@@ -59,52 +111,20 @@ describe("buildRecommendation", () => {
     expect(demo.tone).toBe("neutral");
   });
 
-  it("returns single-sensor status copy when only one location has density (Live)", () => {
+  it("returns single-sensor status copy when the live pin has density", () => {
     const state = emptyState();
-    state.dining_hall_main = {
+    state[SENSOR_LOCATION.id] = {
       density: 78,
       created_at: null,
       prevDensity: null,
+      avgRssi: null,
+      packetCount: null,
     };
     const rec = buildRecommendation(state, false);
-    expect(rec.text).toBe("Dietrick is Busy");
+    expect(rec.text).toBe(`${LOCATIONS[0].shortLabel} is Busy`);
     expect(rec.detail).toBe(
       "Only one live sensor is online — can’t compare across campus yet.",
     );
     expect(rec.tone).toBe("neutral");
-  });
-
-  it("returns similar copy when two locations differ by less than REC_GAP", () => {
-    const state = emptyState();
-    state.science_quad = {
-      density: 40,
-      created_at: null,
-      prevDensity: null,
-    };
-    state.dining_hall_main = {
-      density: 50,
-      created_at: null,
-      prevDensity: null,
-    };
-    const rec = buildRecommendation(state, false);
-    expect(rec.text).toBe("Anywhere looks similar right now");
-    expect(rec.tone).toBe("neutral");
-  });
-
-  it("recommends the quietest spot when gap is at least REC_GAP", () => {
-    const state = emptyState();
-    state.science_quad = {
-      density: 10,
-      created_at: null,
-      prevDensity: null,
-    };
-    state.dining_hall_main = {
-      density: 78,
-      created_at: null,
-      prevDensity: null,
-    };
-    const rec = buildRecommendation(state, false);
-    expect(rec.tone).toBe("go");
-    expect(rec.text).toBe("Go to Derring");
   });
 });
