@@ -54,7 +54,7 @@ export function simHistory(
   return Array.from({ length: n }, (_, i) => {
     const r = fakeReadingAt(i / (n - 1));
     return {
-      created_at: new Date(startMs + i * 15 * 60 * 1000).toISOString(),
+      created_at: new Date(startMs + i * 30 * 1000).toISOString(),
       density: r.density,
       packet_count: r.packet_count,
       avg_rssi: r.avg_rssi,

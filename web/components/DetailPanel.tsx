@@ -212,7 +212,7 @@ export default function DetailPanel({
               ) : null}
             </div>
           </div>
-          <SimGraphs />
+          <SimGraphs locationId={loc.id} live={!demoMode} />
         </motion.aside>
       ) : null}
     </AnimatePresence>

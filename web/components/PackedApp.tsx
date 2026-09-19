@@ -187,7 +187,7 @@ export default function PackedApp() {
             "Last ESP32 row in readings · sensor not posting · dashboard still polls",
           );
         } else if (kind === "none") {
-          setMeta("No ESP32 rows in readings yet · polling every 30s");
+          setMeta(`No ESP32 rows in readings yet · polling every ${POLL_MS / 1000}s`);
         } else {
           setMeta(`ESP32 posting · dashboard poll every ${POLL_MS / 1000}s`);
         }

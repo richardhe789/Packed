@@ -7,8 +7,12 @@ export type ReadingRow = {
   src: string | null;
 };
 
-/** Dev: Live panel reads `sim_readings` instead of ESP32 `readings`. Flip off after demo. */
-export const USE_SIM_READINGS = true;
+/** Live panel + graph read ESP32 `readings`. */
+export const USE_SIM_READINGS = false;
+
+function readingsTable(): "sim_readings" | "readings" {
+  return USE_SIM_READINGS ? "sim_readings" : "readings";
+}
 
 export function getSupabaseConfig(): { url: string; anonKey: string } {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -26,8 +30,7 @@ export async function fetchLatestReadings(
   init?: { signal?: AbortSignal },
 ): Promise<{ latest: ReadingRow | null; previous: ReadingRow | null }> {
   const { url, anonKey } = getSupabaseConfig();
-  const table = USE_SIM_READINGS ? "sim_readings" : "readings";
-  const endpoint = new URL(`${url}/rest/v1/${table}`);
+  const endpoint = new URL(`${url}/rest/v1/${readingsTable()}`);
   endpoint.searchParams.set(
     "select",
     "density,created_at,location,avg_rssi,packet_count,src",
@@ -61,11 +64,11 @@ export async function fetchLatestReadings(
 
 export async function fetchReadingHistory(
   locationId: string,
-  limit = 800,
+  limit = 240,
   init?: { signal?: AbortSignal },
 ): Promise<ReadingRow[]> {
   const { url, anonKey } = getSupabaseConfig();
-  const endpoint = new URL(`${url}/rest/v1/sim_readings`);
+  const endpoint = new URL(`${url}/rest/v1/${readingsTable()}`);
   endpoint.searchParams.set(
     "select",
     "density,created_at,location,avg_rssi,packet_count",

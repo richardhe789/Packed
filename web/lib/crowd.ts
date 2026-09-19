@@ -67,7 +67,7 @@ export function locationFromPlace(place: PlaceFields): LocationDef {
 /** One pin. Name + coordinates come from location.config.json (or the in-app editor). */
 export const LOCATIONS: LocationDef[] = [locationFromPlace(placeFromSensor())];
 
-export const POLL_MS = 30_000;
+export const POLL_MS = 5_000;
 export const REC_GAP = 20;
 /** No new ESP32 row for this long → not live, just the last stored reading. */
 export const STALE_MS = 10 * 60 * 1000;
