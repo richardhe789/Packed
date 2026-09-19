@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   LOCATIONS,
@@ -21,6 +21,13 @@ const CampusMap = dynamic(() => import("@/components/CampusMap"), {
   ssr: false,
   loading: () => <div className="map-canvas map-loading">Loading campus map…</div>,
 });
+
+function isAbortError(err: unknown): boolean {
+  return (
+    (err instanceof DOMException && err.name === "AbortError") ||
+    (err instanceof Error && err.name === "AbortError")
+  );
+}
 
 export default function PackedApp() {
   const router = useRouter();
@@ -43,6 +50,9 @@ export default function PackedApp() {
     initialDemo ? "dining_hall_west" : "dining_hall_main",
   );
 
+  const liveGenerationRef = useRef(0);
+  const liveAbortRef = useRef<AbortController | null>(null);
+
   const syncUrl = useCallback(
     (demo: boolean) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -58,41 +68,6 @@ export default function PackedApp() {
     },
     [pathname, router, searchParams],
   );
-
-  const refreshLive = useCallback(async () => {
-    setLiveLoading(true);
-    try {
-      const liveIds = LOCATIONS.filter((l) => l.liveSensor).map((l) => l.id);
-      const results = await Promise.all(
-        liveIds.map(async (id) => {
-          const { latest, previous } = await fetchLatestReadings(id);
-          return { id, latest, previous };
-        }),
-      );
-
-      setState(() => {
-        const next = emptyState();
-        for (const { id, latest, previous } of results) {
-          next[id] = {
-            density: latest ? latest.density : null,
-            created_at: latest ? latest.created_at : null,
-            prevDensity: previous ? previous.density : null,
-          };
-        }
-        return next;
-      });
-      setMeta(
-        `Live · updated ${new Date().toLocaleTimeString()} · every ${POLL_MS / 1000}s`,
-      );
-    } catch (err) {
-      console.error(err);
-      setMeta(
-        `Live error: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    } finally {
-      setLiveLoading(false);
-    }
-  }, []);
 
   const enterDemo = useCallback(() => {
     const seeded = seedDemoState(new Date().toISOString());
@@ -133,12 +108,67 @@ export default function PackedApp() {
 
   useEffect(() => {
     if (demoMode) return;
-    void refreshLive();
-    const id = window.setInterval(() => {
-      void refreshLive();
+
+    const runPoll = async () => {
+      liveAbortRef.current?.abort();
+      const controller = new AbortController();
+      liveAbortRef.current = controller;
+      const signal = controller.signal;
+      const gen = ++liveGenerationRef.current;
+
+      setLiveLoading(true);
+      try {
+        const liveIds = LOCATIONS.filter((l) => l.liveSensor).map((l) => l.id);
+        const results = await Promise.all(
+          liveIds.map(async (id) => {
+            const { latest, previous } = await fetchLatestReadings(id, {
+              signal,
+            });
+            return { id, latest, previous };
+          }),
+        );
+
+        if (gen !== liveGenerationRef.current || signal.aborted) return;
+
+        setState(() => {
+          const next = emptyState();
+          for (const { id, latest, previous } of results) {
+            next[id] = {
+              density: latest ? latest.density : null,
+              created_at: latest ? latest.created_at : null,
+              prevDensity: previous ? previous.density : null,
+            };
+          }
+          return next;
+        });
+        setMeta(
+          `Live · updated ${new Date().toLocaleTimeString()} · every ${POLL_MS / 1000}s`,
+        );
+      } catch (err) {
+        if (isAbortError(err) || signal.aborted) return;
+        if (gen !== liveGenerationRef.current) return;
+        console.error(err);
+        setMeta(
+          `Live error: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      } finally {
+        if (gen === liveGenerationRef.current) {
+          setLiveLoading(false);
+        }
+      }
+    };
+
+    void runPoll();
+    const intervalId = window.setInterval(() => {
+      void runPoll();
     }, POLL_MS);
-    return () => window.clearInterval(id);
-  }, [demoMode, refreshLive]);
+
+    return () => {
+      window.clearInterval(intervalId);
+      liveAbortRef.current?.abort();
+      liveAbortRef.current = null;
+    };
+  }, [demoMode]);
 
   const recommendation = useMemo(
     () => buildRecommendation(state, demoMode),

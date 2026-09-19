@@ -26,3 +26,10 @@
 #ifndef LOCATION_ID
 #define LOCATION_ID "dining_hall_main"
 #endif
+
+#ifndef DEVICE_INGEST_KEY
+#define DEVICE_INGEST_KEY "YOUR_DEVICE_INGEST_KEY"
+#endif
+#ifndef INGEST_PATH
+#define INGEST_PATH "/functions/v1/ingest-reading"
+#endif

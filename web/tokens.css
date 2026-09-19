@@ -1,0 +1,221 @@
+/* Hallmark · tokens for Packed web app (keep inside web/ — Next must not import outside) */
+
+/* Register colors so theme flips interpolate instead of snapping */
+@property --color-paper {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(97% 0.012 95);
+}
+@property --color-paper-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(94% 0.016 95);
+}
+@property --color-paper-3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(91% 0.02 95);
+}
+@property --color-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(20% 0.012 250);
+}
+@property --color-ink-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(42% 0.02 250);
+}
+@property --color-muted-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(52% 0.02 250);
+}
+@property --color-rule {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(86% 0.014 95);
+}
+@property --color-accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(86% 0.18 95);
+}
+@property --color-accent-deep {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(72% 0.16 95);
+}
+@property --color-accent-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(66% 0.18 235);
+}
+@property --color-accent-3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(68% 0.24 18);
+}
+@property --color-mint {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(72% 0.14 150);
+}
+@property --color-mint-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(32% 0.08 150);
+}
+@property --color-busy-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(35% 0.12 18);
+}
+@property --color-focus {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(55% 0.16 235);
+}
+@property --color-quiet {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(72% 0.14 150);
+}
+@property --color-moderate {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(72% 0.16 95);
+}
+@property --color-busy {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(68% 0.24 18);
+}
+@property --map-ground {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(88% 0.02 130);
+}
+@property --shadow-cast {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(20% 0.012 250 / 0.22);
+}
+@property --btn-cast-idle {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(20% 0.012 250 / 0.12);
+}
+
+:root {
+  --theme-dur: 700ms;
+  --theme-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --color-paper: oklch(97% 0.012 95);
+  --color-paper-2: oklch(94% 0.016 95);
+  --color-paper-3: oklch(91% 0.02 95);
+  --color-ink: oklch(20% 0.012 250);
+  --color-ink-2: oklch(42% 0.02 250);
+  --color-muted-fg: oklch(52% 0.02 250);
+  --color-rule: oklch(86% 0.014 95);
+  --color-accent: oklch(86% 0.18 95);
+  --color-accent-deep: oklch(72% 0.16 95);
+  --color-accent-2: oklch(66% 0.18 235);
+  --color-accent-3: oklch(68% 0.24 18);
+  --color-mint: oklch(72% 0.14 150);
+  --color-mint-ink: oklch(32% 0.08 150);
+  --color-busy-ink: oklch(35% 0.12 18);
+  --color-focus: oklch(55% 0.16 235);
+  --color-quiet: oklch(72% 0.14 150);
+  --color-moderate: oklch(72% 0.16 95);
+  --color-busy: oklch(68% 0.24 18);
+  --color-background: var(--color-paper);
+  --color-surface: var(--color-paper);
+  --color-surface-2: var(--color-paper-2);
+  --color-foreground: var(--color-ink);
+  --color-border: var(--color-rule);
+  --color-ring: var(--color-focus);
+  --color-accent-dim: color-mix(in oklch, var(--color-accent) 28%, transparent);
+  --map-ground: oklch(88% 0.02 130);
+  --shadow-cast: oklch(20% 0.012 250 / 0.22);
+  --btn-cast-idle: oklch(20% 0.012 250 / 0.12);
+  --color-scheme: light;
+
+  /* next/font injects --font-sans and --font-mono-face on <html> */
+  --font-display: var(--font-sans), "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: var(--font-sans), "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), "JetBrains Mono", ui-monospace, monospace;
+
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-1: var(--space-3xs);
+  --space-2: var(--space-2xs);
+  --space-3: var(--space-xs);
+  --space-4: var(--space-sm);
+  --space-5: 1.25rem;
+  --space-6: var(--space-md);
+  --space-8: var(--space-lg);
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --text-display-s: clamp(2rem, 4vw + 0.5rem, 3rem);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-press: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease: var(--ease-out);
+  --dur-short: 140ms;
+  --dur-med: 220ms;
+
+  --radius-card: 20px;
+  --radius-pill: 999px;
+  --radius-input: 12px;
+  --radius: var(--radius-card);
+
+  --panel-width: min(360px, 92vw);
+  --topbar-h: 72px;
+  --page-gutter: var(--space-md);
+}
+
+/* Hum dark — cream ink on cool paper, same multi-accent */
+[data-theme="dark"] {
+  --color-paper: oklch(18% 0.018 250);
+  --color-paper-2: oklch(22% 0.02 250);
+  --color-paper-3: oklch(28% 0.022 250);
+  --color-ink: oklch(96% 0.012 95);
+  --color-ink-2: oklch(78% 0.02 95);
+  --color-muted-fg: oklch(68% 0.02 250);
+  --color-rule: oklch(36% 0.02 250);
+  --color-accent: oklch(86% 0.18 95);
+  --color-accent-deep: oklch(72% 0.16 95);
+  --color-accent-2: oklch(72% 0.16 235);
+  --color-accent-3: oklch(72% 0.22 18);
+  --color-mint: oklch(78% 0.14 150);
+  --color-mint-ink: oklch(88% 0.08 150);
+  --color-busy-ink: oklch(92% 0.06 18);
+  --color-focus: oklch(72% 0.14 235);
+  --color-quiet: oklch(78% 0.14 150);
+  --color-moderate: oklch(72% 0.16 95);
+  --color-busy: oklch(72% 0.22 18);
+  --color-background: var(--color-paper);
+  --color-surface: var(--color-paper);
+  --color-surface-2: var(--color-paper-2);
+  --color-foreground: var(--color-ink);
+  --color-border: var(--color-rule);
+  --color-ring: var(--color-focus);
+  --color-accent-dim: color-mix(in oklch, var(--color-accent) 22%, transparent);
+  --map-ground: oklch(26% 0.02 150);
+  --shadow-cast: oklch(0% 0 0 / 0.5);
+  --btn-cast-idle: oklch(0% 0 0 / 0.35);
+  --color-scheme: dark;
+}
