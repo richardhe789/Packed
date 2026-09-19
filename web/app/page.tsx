@@ -5,8 +5,10 @@ export default function HomePage() {
   return (
     <Suspense
       fallback={
-        <div className="page">
-          <p className="meta-row">Loading Campus Crowd…</p>
+        <div className="map-shell">
+          <p className="meta-row" style={{ padding: "1.5rem" }}>
+            Loading campus map…
+          </p>
         </div>
       }
     >

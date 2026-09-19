@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 56" role="img" aria-label="Virginia Tech">
+  <!-- Demo lockup using VT brand colors. Trademark belongs to Virginia Tech; for hackathon UI only. -->
+  <rect width="120" height="56" rx="8" fill="#861F41"/>
+  <text x="12" y="36" font-family="Georgia, 'Times New Roman', serif" font-size="28" font-weight="700" fill="#E87722" letter-spacing="-1">VT</text>
+  <text x="52" y="24" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="700" fill="#FFFFFF" letter-spacing="0.5">VIRGINIA</text>
+  <text x="52" y="38" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="700" fill="#FFFFFF" letter-spacing="1.5">TECH</text>
+</svg>

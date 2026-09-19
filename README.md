@@ -20,6 +20,7 @@ Ambient WiFi frames
 | `web/` | Next.js App Router UI (Vercel root) |
 | `firmware/include/config.h.example` | Template for WiFi + Supabase secrets |
 | `web/.env.example` | Template for Next.js Supabase env vars |
+| [`NEXT_STEPS.md`](NEXT_STEPS.md) | Post-hackathon roadmap (sim data, multi-campus, etc.) |
 
 ## Phase checklist
 
@@ -183,3 +184,7 @@ MAC tracking, entry/exit counting, multi-sensor logic, historical “come back i
 ## Minimum viable demo
 
 ESP32 pushing real numbers to Supabase + dashboard updating — even with rough thresholds — beats a perfect design that never ships.
+
+## After the hackathon
+
+See [`NEXT_STEPS.md`](NEXT_STEPS.md) for realistic test data, other campuses, more sensors, and product follow-ups.
