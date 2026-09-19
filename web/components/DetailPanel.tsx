@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   formatReadingAge,
+  liveSourceKind,
   statusFromDensity,
   trendDirection,
   type LocationDef,
@@ -21,8 +22,7 @@ import {
   type ReadingState,
   type Recommendation,
 } from "@/lib/crowd";
-import HistoryChart from "@/components/HistoryChart";
-import type { HistoryPoint } from "@/lib/sim";
+import SimGraphs from "@/components/SimGraphs";
 
 type Props = {
   location: LocationDef;
@@ -35,7 +35,6 @@ type Props = {
   sheetExpanded: boolean;
   meta: string;
   liveLoading: boolean;
-  history: HistoryPoint[];
   onClose: () => void;
   onCollapse: () => void;
   onExpand: () => void;
@@ -62,7 +61,6 @@ export default function DetailPanel({
   sheetExpanded,
   meta,
   liveLoading,
-  history,
   onClose,
   onCollapse,
   onExpand,
@@ -152,40 +150,50 @@ export default function DetailPanel({
               onPeekClick={sheetExpanded ? undefined : onExpand}
             />
 
-            <p
-              className="rec-text peek-tip"
-              onClick={sheetExpanded ? undefined : onExpand}
-            >
-              {recommendation.text}
-            </p>
+            {demoMode ? (
+              <p
+                className="rec-text peek-tip"
+                onClick={sheetExpanded ? undefined : onExpand}
+              >
+                {recommendation.text}
+              </p>
+            ) : null}
 
             <div className="detail-expanded">
               <div className="detail-chips">
-                {loc.liveSensor ? (
-                  <span className="sensor-chip live">
-                    <Radio size={12} aria-hidden /> Sensor
-                  </span>
+                {demoMode ? (
+                  loc.liveSensor ? (
+                    <span className="sensor-chip live">
+                      <Radio size={12} aria-hidden /> Sensor
+                    </span>
+                  ) : (
+                    <span className="sensor-chip">
+                      <Wifi size={12} aria-hidden /> Preview
+                    </span>
+                  )
                 ) : (
-                  <span className="sensor-chip">
-                    <Wifi size={12} aria-hidden /> Preview
-                  </span>
+                  <LiveSourceChip
+                    src={reading.src}
+                    createdAt={reading.created_at}
+                  />
                 )}
                 {bestId === loc.id ? (
                   <span className="sensor-chip best">Best pick</span>
                 ) : null}
               </div>
 
-              {!demoMode ? <HistoryChart rows={history} /> : null}
+              {demoMode ? (
+                <section
+                  className={`recommendation compact tone-${recommendation.tone}`}
+                  aria-live="polite"
+                >
+                  <p className="rec-label">Packed tip</p>
+                  <p className="rec-text">{recommendation.text}</p>
+                  <p className="rec-detail">{recommendation.detail}</p>
+                </section>
+              ) : null}
 
-              <section
-                className={`recommendation compact tone-${recommendation.tone}`}
-                aria-live="polite"
-              >
-                <p className="rec-label">Packed tip</p>
-                <p className="rec-text">{recommendation.text}</p>
-                <p className="rec-detail">{recommendation.detail}</p>
-              </section>
-
+              {demoMode ? (
               <p
                 className={`meta-row${!demoMode && liveLoading ? " is-loading" : ""}`}
                 role="status"
@@ -197,6 +205,7 @@ export default function DetailPanel({
                 )}
                 <span>{meta}</span>
               </p>
+              ) : null}
 
               {demoMode ? (
                 <div className="dev-panel embedded">
@@ -224,9 +233,10 @@ export default function DetailPanel({
                 </div>
               ) : null}
 
-              <div
-                className={`dev-panel embedded pin-editor${editPin ? " is-open" : ""}`}
-              >
+              {demoMode ? (
+                <div
+                  className={`dev-panel embedded pin-editor${editPin ? " is-open" : ""}`}
+                >
                 <h3>Pin location</h3>
                 <p className="dev-hint">
                   Place name and Google Maps coordinates. The ESP32 still posts
@@ -299,15 +309,60 @@ export default function DetailPanel({
                   />
                 </label>
               </div>
+              ) : null}
 
+              {demoMode ? (
               <p className="privacy-note">
                 Ambient WiFi activity only — no device tracking, no headcount.
               </p>
+              ) : null}
             </div>
           </div>
+          <SimGraphs />
         </motion.aside>
       ) : null}
     </AnimatePresence>
+  );
+}
+
+function LiveSourceChip({
+  src,
+  createdAt,
+}: {
+  src: string | null | undefined;
+  createdAt: string | null;
+}) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const kind = liveSourceKind(src, createdAt, nowMs);
+  if (kind === "sim") {
+    return (
+      <span className="sensor-chip sim">
+        <Wifi size={12} aria-hidden /> Simulated
+      </span>
+    );
+  }
+  if (kind === "live") {
+    return (
+      <span className="sensor-chip live">
+        <Radio size={12} aria-hidden /> Live ESP32
+      </span>
+    );
+  }
+  if (kind === "stale") {
+    return (
+      <span className="sensor-chip">
+        <Radio size={12} aria-hidden /> Last ESP32 reading
+      </span>
+    );
+  }
+  return (
+    <span className="sensor-chip">
+      <Wifi size={12} aria-hidden /> No ESP32 row
+    </span>
   );
 }
 

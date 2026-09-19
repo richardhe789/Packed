@@ -130,27 +130,6 @@ body {
   overflow: visible;
 }
 
-.brand-x {
-  flex-shrink: 0;
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--color-muted-fg);
-  user-select: none;
-}
-
-.packed-logo {
-  display: block;
-  width: 64px;
-  height: 64px;
-  flex-shrink: 0;
-  object-fit: contain;
-  border-radius: var(--radius-input);
-  border: 2px solid var(--color-ink);
-  background: #fff;
-}
-
 .topbar-actions {
   display: inline-flex;
   align-items: center;
@@ -160,7 +139,7 @@ body {
   position: relative;
 }
 
-.overflow-btn {
+.icon-btn.overflow-btn {
   display: none;
 }
 
@@ -582,24 +561,21 @@ body {
   font-size: 11px;
   font-weight: 650;
   font-style: normal;
-  color: var(--color-ink);
-  background: var(--color-paper);
-  border: 2px solid var(--color-ink);
+  /* Stay light-mode ink on the map so dark theme does not invert/fade this chip. */
+  color: oklch(20% 0.012 250);
+  background: oklch(97% 0.012 95);
+  border: 2px solid oklch(20% 0.012 250);
   padding: 0.2rem 0.5rem;
   border-radius: var(--radius-pill);
   white-space: nowrap;
   max-width: 110px;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition:
-    color var(--theme-dur) var(--theme-ease),
-    background-color var(--theme-dur) var(--theme-ease),
-    border-color var(--theme-dur) var(--theme-ease);
 }
 
 .geo-pin.is-selected .geo-pin-label {
   background: var(--color-accent);
-  border-color: var(--color-ink);
+  border-color: oklch(20% 0.012 250);
 }
 
 .campus-svg {
@@ -638,15 +614,19 @@ body {
   z-index: 15;
   right: var(--space-sm);
   top: var(--space-sm);
-  bottom: var(--space-sm);
   width: var(--panel-width);
   max-height: calc(100% - 2 * var(--space-sm));
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  overflow: auto;
 }
 
 .detail-panel-inner {
   pointer-events: auto;
-  height: 100%;
+  height: auto;
+  min-height: 0;
   overflow: auto;
   padding: var(--space-md);
   border-radius: var(--radius-card);
@@ -656,6 +636,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+}
+
+.detail-panel > .detail-panel-inner:first-child {
+  flex: 1 1 auto;
 }
 
 .detail-header {
@@ -697,6 +681,69 @@ body {
   line-height: 1.15;
   overflow-wrap: anywhere;
   min-width: 0;
+}
+
+.sim-graphs {
+  flex: 0 0 auto;
+}
+
+.sim-graphs-stage {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.sim-graphs-nav {
+  width: 32px;
+  height: 32px;
+}
+
+.sim-graphs-chart {
+  display: block;
+  width: 100%;
+  height: 168px;
+  overflow: visible;
+}
+
+.sim-graphs-grid {
+  stroke: var(--color-rule);
+  stroke-width: 0.7;
+}
+
+.sim-graphs-axis {
+  stroke: var(--color-ink);
+  stroke-width: 1.1;
+}
+
+.sim-graphs-area {
+  fill: color-mix(in oklch, var(--color-accent) 32%, transparent);
+}
+
+.sim-graphs-line {
+  fill: none;
+  stroke: var(--color-accent-deep);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.sim-graphs-pt {
+  fill: var(--color-paper);
+  stroke: var(--color-ink);
+  stroke-width: 1;
+}
+
+.sim-graphs-tick {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  fill: var(--color-ink-2);
+}
+
+.sim-graphs-axis-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  fill: var(--color-ink-2);
 }
 
 .icon-btn {
@@ -759,6 +806,12 @@ body {
     var(--color-paper)
   );
   border-color: var(--color-accent-2);
+}
+
+.sensor-chip.sim {
+  color: var(--color-ink);
+  background: var(--color-paper-2);
+  border-color: var(--color-ink-2);
 }
 
 .sensor-chip.best {
@@ -1132,6 +1185,10 @@ body {
     --map-bottom-pad: min(70dvh, 560px);
   }
 
+  .map-shell[data-demo="false"][data-sheet-expanded="true"] {
+    --map-bottom-pad: min(42dvh, 280px);
+  }
+
   .map-topbar {
     grid-template-columns: minmax(0, 1fr) auto;
     padding: var(--space-2xs) var(--space-sm);
@@ -1144,21 +1201,12 @@ body {
     display: none;
   }
 
-  .overflow-btn {
+  .icon-btn.overflow-btn {
     display: grid;
   }
 
   .vt-logo {
     height: 28px;
-  }
-
-  .packed-logo {
-    width: 36px;
-    height: 36px;
-  }
-
-  .brand-x {
-    font-size: 0.9rem;
   }
 
   .map-fade-right {
@@ -1199,6 +1247,15 @@ body {
     gap: var(--space-2xs);
   }
 
+  .map-shell[data-demo="false"] .detail-panel.is-expanded {
+    height: auto;
+    max-height: min(42dvh, 280px);
+  }
+
+  .detail-panel.is-expanded .detail-panel-inner {
+    height: auto;
+  }
+
   .sheet-handle {
     display: block;
     appearance: none;
@@ -1237,6 +1294,10 @@ body {
   .detail-panel.is-peek .density-meta,
   .detail-panel.is-peek .telemetry,
   .detail-panel.is-peek .density-bar {
+    display: none;
+  }
+
+  .detail-panel.is-peek .sim-graphs {
     display: none;
   }
 

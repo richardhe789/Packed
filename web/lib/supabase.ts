@@ -4,7 +4,11 @@ export type ReadingRow = {
   location: string;
   avg_rssi: number | null;
   packet_count: number | null;
+  src: string | null;
 };
+
+/** Dev: Live panel reads `sim_readings` instead of ESP32 `readings`. Flip off after demo. */
+export const USE_SIM_READINGS = true;
 
 export function getSupabaseConfig(): { url: string; anonKey: string } {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -22,10 +26,11 @@ export async function fetchLatestReadings(
   init?: { signal?: AbortSignal },
 ): Promise<{ latest: ReadingRow | null; previous: ReadingRow | null }> {
   const { url, anonKey } = getSupabaseConfig();
-  const endpoint = new URL(`${url}/rest/v1/readings`);
+  const table = USE_SIM_READINGS ? "sim_readings" : "readings";
+  const endpoint = new URL(`${url}/rest/v1/${table}`);
   endpoint.searchParams.set(
     "select",
-    "density,created_at,location,avg_rssi,packet_count",
+    "density,created_at,location,avg_rssi,packet_count,src",
   );
   endpoint.searchParams.set("location", `eq.${locationId}`);
   endpoint.searchParams.set("order", "created_at.desc");
@@ -45,9 +50,12 @@ export async function fetchLatestReadings(
   }
 
   const rows = (await res.json()) as ReadingRow[];
+  const tagged = USE_SIM_READINGS
+    ? rows.map((r) => ({ ...r, src: r.src ?? "sim" }))
+    : rows;
   return {
-    latest: rows[0] ?? null,
-    previous: rows[1] ?? null,
+    latest: tagged[0] ?? null,
+    previous: tagged[1] ?? null,
   };
 }
 

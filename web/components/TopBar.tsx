@@ -66,17 +66,6 @@ export default function TopBar({
             height={64}
           />
         </a>
-        <span className="brand-x" aria-hidden>
-          x
-        </span>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/packed-logo.png"
-          alt="Packed"
-          className="packed-logo"
-          width={64}
-          height={64}
-        />
       </div>
 
       <h1 className="map-topbar-title">PACKED</h1>
@@ -154,6 +143,7 @@ export default function TopBar({
               <Radio size={14} aria-hidden />
               Live
             </button>
+            {demoMode ? (
             <button
               type="button"
               role="menuitem"
@@ -167,6 +157,7 @@ export default function TopBar({
               <MapPin size={14} aria-hidden />
               {editPin ? "Hide pin editor" : "Edit pin"}
             </button>
+            ) : null}
           </div>
         ) : null}
       </div>

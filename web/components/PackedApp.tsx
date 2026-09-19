@@ -10,6 +10,7 @@ import {
   SENSOR_LOCATION,
   buildRecommendation,
   emptyState,
+  liveSourceKind,
   locationFromPlace,
   parsePlaceFields,
   placeFromSensor,
@@ -19,9 +20,8 @@ import {
   type PlaceFields,
   type ReadingState,
 } from "@/lib/crowd";
-import { fetchLatestReadings, fetchReadingHistory } from "@/lib/supabase";
+import { fetchLatestReadings } from "@/lib/supabase";
 import DetailPanel from "@/components/DetailPanel";
-import type { HistoryPoint } from "@/lib/sim";
 import TopBar from "@/components/TopBar";
 
 const CampusMap = dynamic(() => import("@/components/CampusMap"), {
@@ -55,7 +55,6 @@ export default function PackedApp() {
       : "Live · fetching…",
   );
   const [liveLoading, setLiveLoading] = useState(false);
-  const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(
     SENSOR_LOCATION.id,
   );
@@ -86,7 +85,6 @@ export default function PackedApp() {
     setDemoMode(true);
     setLiveLoading(false);
     setState(seeded);
-    setHistory([]);
     setMeta("Demo · one sensor pin · scrub density in the panel");
     setSelectedId(SENSOR_LOCATION.id);
     syncUrl(true);
@@ -95,10 +93,10 @@ export default function PackedApp() {
   const enterLive = useCallback(() => {
     setDemoMode(false);
     setState(emptyState());
-    setHistory([]);
     setMeta("Live · fetching…");
     setLiveLoading(true);
     setSelectedId(SENSOR_LOCATION.id);
+    setEditPin(false);
     syncUrl(false);
   }, [syncUrl]);
 
@@ -161,10 +159,6 @@ export default function PackedApp() {
             return { id, latest, previous };
           }),
         );
-        const historyId = liveIds[0];
-        const historyRows = historyId
-          ? await fetchReadingHistory(historyId, 800, { signal })
-          : [];
 
         if (gen !== liveGenerationRef.current || signal.aborted) return;
 
@@ -177,14 +171,28 @@ export default function PackedApp() {
               prevDensity: previous ? previous.density : null,
               avgRssi: latest ? latest.avg_rssi : null,
               packetCount: latest ? latest.packet_count : null,
+              src: latest ? latest.src : null,
             };
           }
           return next;
         });
-        setHistory(historyRows);
-        setMeta(
-          `Live · updated ${new Date().toLocaleTimeString()} · every ${POLL_MS / 1000}s`,
+        const latestRow = results[0]?.latest ?? null;
+        const kind = liveSourceKind(
+          latestRow?.src,
+          latestRow?.created_at ?? null,
+          Date.now(),
         );
+        if (kind === "sim") {
+          setMeta("Simulated · sim_readings / src=sim · not a plugged-in ESP32");
+        } else if (kind === "stale") {
+          setMeta(
+            "Last ESP32 row in readings · sensor not posting · dashboard still polls",
+          );
+        } else if (kind === "none") {
+          setMeta("No ESP32 rows in readings yet · polling every 30s");
+        } else {
+          setMeta(`ESP32 posting · dashboard poll every ${POLL_MS / 1000}s`);
+        }
       } catch (err) {
         if (isAbortError(err) || signal.aborted) return;
         if (gen !== liveGenerationRef.current) return;
@@ -230,6 +238,7 @@ export default function PackedApp() {
         created_at: new Date().toISOString(),
         avgRssi: prev[id].avgRssi,
         packetCount: prev[id].packetCount,
+        src: prev[id].src,
       },
     }));
   }
@@ -238,6 +247,7 @@ export default function PackedApp() {
     <div
       className="map-shell"
       data-sheet-expanded={sheetExpanded ? "true" : "false"}
+      data-demo={demoMode ? "true" : "false"}
     >
       <TopBar
         demoMode={demoMode}
@@ -275,7 +285,6 @@ export default function PackedApp() {
           sheetExpanded={sheetExpanded}
           meta={meta}
           liveLoading={liveLoading}
-          history={history}
           onClose={() => setSelectedId(null)}
           onCollapse={() => setSheetExpanded(false)}
           onExpand={() => setSheetExpanded(true)}

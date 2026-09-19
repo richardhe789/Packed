@@ -10,6 +10,7 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   CAMPUS_VIEW,
+  liveSourceKind,
   statusFromDensity,
   type LocationDef,
   type ReadingState,
@@ -38,10 +39,14 @@ function ensureMapLibreWorker() {
   workerConfigured = true;
 }
 
-function mapBottomPad(expanded: boolean) {
+function mapBottomPad(expanded: boolean, demoMode: boolean) {
   if (typeof window === "undefined") return 0;
   if (!window.matchMedia("(max-width: 51.1875rem)").matches) return 0;
-  if (expanded) return Math.min(window.innerHeight * 0.7, 560);
+  if (expanded) {
+    return demoMode
+      ? Math.min(window.innerHeight * 0.7, 560)
+      : Math.min(window.innerHeight * 0.42, 280);
+  }
   return 168;
 }
 
@@ -182,13 +187,13 @@ export default function CampusMap({
         top: 0,
         left: 0,
         right: 0,
-        bottom: mapBottomPad(sheetExpanded),
+        bottom: mapBottomPad(sheetExpanded, demoMode),
       });
     };
     apply();
     window.addEventListener("resize", apply);
     return () => window.removeEventListener("resize", apply);
-  }, [mapEpoch, sheetExpanded]);
+  }, [mapEpoch, sheetExpanded, demoMode]);
 
   return (
     <div className="map-canvas">
@@ -202,7 +207,11 @@ export default function CampusMap({
           const crowd = statusFromDensity(reading?.density ?? null);
           const selected = loc.id === selectedId;
           const best = loc.id === bestId;
-          const pulse = !demoMode && loc.liveSensor && !reduceMotion;
+          const pulse =
+            !demoMode &&
+            liveSourceKind(reading?.src, reading?.created_at ?? null, Date.now()) ===
+              "live" &&
+            !reduceMotion;
 
           return (
             <button
