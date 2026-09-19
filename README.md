@@ -1,6 +1,8 @@
-# Campus Crowd (ProjectSolver)
+# Packed
 
 VTHacks project: estimate how busy a dining hall is using a **single ESP32** as a passive ambient WiFi sensor. No MAC tracking, no headcount — only aggregate RSSI + packet activity → a 0–100 density score → Supabase → a **Next.js** web dashboard (**Quiet / Moderate / Busy**), deployable on Vercel.
+
+Formerly known as Campus Crowd / ProjectSolver.
 
 ## Architecture
 
@@ -86,7 +88,7 @@ Firmware never reads or stores MAC addresses — only RSSI sums and packet count
 
 ## Supabase
 
-Project: **ProjectSolver** (`myjfbuathehfghagbnot`)
+Project: **Packed** (`myjfbuathehfghagbnot`) — rename the display name in the Supabase dashboard if it still shows ProjectSolver.
 
 Table `public.readings`:
 
@@ -188,3 +190,12 @@ ESP32 pushing real numbers to Supabase + dashboard updating — even with rough 
 ## After the hackathon
 
 See [`NEXT_STEPS.md`](NEXT_STEPS.md) for realistic test data, other campuses, more sensors, and product follow-ups.
+
+## Rename checklist (external)
+
+Code/docs in this repo use **Packed**. Finish the rename outside the repo:
+
+1. **GitHub** — Settings → General → Repository name → `Packed` (then update local remote / folder).
+2. **Vercel** — Project Settings → General → Project Name → `packed` (or reconnect after GitHub rename).
+3. **Supabase** — Project Settings → General → Project name → `Packed` (ref `myjfbuathehfghagbnot` stays the same).
+4. **Local folder** — close Cursor, rename `ProjectSolver` → `Packed`, reopen.

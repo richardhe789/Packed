@@ -1,4 +1,4 @@
-# Next steps — Campus Crowd
+# Next steps — Packed
 
 Post-hackathon roadmap. The MVP ships: one ESP32 → Supabase → Next.js map/dashboard (Demo + Live). What’s below is how to make it credible, portable, and easier to demo without standing in a dining hall for hours.
 
@@ -6,7 +6,7 @@ Post-hackathon roadmap. The MVP ships: one ESP32 → Supabase → Next.js map/da
 
 ## 1. Realistic test / demo data
 
-Sliders prove the UI; they don’t prove the product. Generate synthetic (or replayed) readings that *look* like a campus day.
+Sliders prove the UI; they don’t prove the product. Generate synthetic (or replayed) readings that _look_ like a campus day.
 
 ### Goals
 
@@ -16,22 +16,22 @@ Sliders prove the UI; they don’t prove the product. Generate synthetic (or rep
 
 ### Ideas (pick one first)
 
-| Approach | What it is | Why |
-|----------|------------|-----|
-| **Seed script** | Node/TS (or SQL) that `INSERT`s rows into `readings` on a schedule | Fast; uses real Live path |
-| **Edge Function cron** | Supabase scheduled function writes fake density curves | No laptop left running |
-| **Replay file** | Record a real afternoon of Serial/`readings`, replay with timestamps shifted to “now” | Most believable |
-| **Pattern generator** | Parametric day curve: quiet morning → lunch spike → afternoon lull → dinner spike + noise | Good for judges; tunable |
+| Approach               | What it is                                                                                | Why                       |
+| ---------------------- | ----------------------------------------------------------------------------------------- | ------------------------- |
+| **Seed script**        | Node/TS (or SQL) that `INSERT`s rows into `readings` on a schedule                        | Fast; uses real Live path |
+| **Edge Function cron** | Supabase scheduled function writes fake density curves                                    | No laptop left running    |
+| **Replay file**        | Record a real afternoon of Serial/`readings`, replay with timestamps shifted to “now”     | Most believable           |
+| **Pattern generator**  | Parametric day curve: quiet morning → lunch spike → afternoon lull → dinner spike + noise | Good for judges; tunable  |
 
 ### Suggested density curve (lunch hall)
 
 Rough shape for one location over a weekday:
 
-- 07:00–10:30 → low 10–25  
-- 11:00–13:30 → ramp to 70–95, hold, taper  
-- 14:00–16:30 → moderate 30–50  
-- 17:00–19:30 → second peak 60–85  
-- Night → drift toward quiet  
+- 07:00–10:30 → low 10–25
+- 11:00–13:30 → ramp to 70–95, hold, taper
+- 14:00–16:30 → moderate 30–50
+- 17:00–19:30 → second peak 60–85
+- Night → drift toward quiet
 
 Add small random walk (±3–8 density) and occasional “bus burst” spikes so it doesn’t look synthetic. Stagger peaks across locations so the recommendation engine has a clear “go here, not there.”
 
@@ -80,10 +80,10 @@ Today VT is hard-coded: `CAMPUS_VIEW`, `LOCATIONS` (labels, coords, `liveSensor`
 
 ### Onboarding checklist for a new school
 
-- [ ] Pick 2–5 high-traffic spots (dining, library, rec) with public coords  
-- [ ] Add campus profile + map center/zoom  
-- [ ] Deploy one ESP32 (or sim data) for at least one `liveSensor: true` id  
-- [ ] Retune RSSI/packet thresholds at that venue (Phase checklist item 6)  
+- [ ] Pick 2–5 high-traffic spots (dining, library, rec) with public coords
+- [ ] Add campus profile + map center/zoom
+- [ ] Deploy one ESP32 (or sim data) for at least one `liveSensor: true` id
+- [ ] Retune RSSI/packet thresholds at that venue (Phase checklist item 6)
 - [ ] Confirm privacy story still holds (no MACs, aggregate only)
 
 ### Multi-tenant later
@@ -135,17 +135,17 @@ Separate Supabase projects per school vs one DB with `campus_id` on `readings`. 
 
 Still out of scope unless requirements change:
 
-- MAC tracking / device identity  
-- True entry/exit people counting  
-- Campus enterprise WiFi auth for the ESP32 uplink (phone hotspot stays the path)  
+- MAC tracking / device identity
+- True entry/exit people counting
+- Campus enterprise WiFi auth for the ESP32 uplink (phone hotspot stays the path)
 - Perfect absolute occupancy — sell **relative** busyness
 
 ---
 
 ## Suggested order
 
-1. **Seed / sim readings** — unlocks Live demos and UI work without venue time.  
-2. **Venue calibration** — makes the one real sensor trustworthy.  
-3. **Campus config files** — unlocks “works at other schools” without rewriting the app.  
-4. **History + sparkline** — stronger story than a single number.  
+1. **Seed / sim readings** — unlocks Live demos and UI work without venue time.
+2. **Venue calibration** — makes the one real sensor trustworthy.
+3. **Campus config files** — unlocks “works at other schools” without rewriting the app.
+4. **History + sparkline** — stronger story than a single number.
 5. **Second sensor + harder RLS** — when you’re past demo and into a real pilot.

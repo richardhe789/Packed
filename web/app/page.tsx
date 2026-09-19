@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import CampusCrowdApp from "@/components/CampusCrowdApp";
+import PackedApp from "@/components/PackedApp";
 
 export default function HomePage() {
   return (
@@ -7,12 +7,12 @@ export default function HomePage() {
       fallback={
         <div className="map-shell">
           <p className="meta-row" style={{ padding: "1.5rem" }}>
-            Loading campus map…
+            Loading Packed…
           </p>
         </div>
       }
     >
-      <CampusCrowdApp />
+      <PackedApp />
     </Suspense>
   );
 }

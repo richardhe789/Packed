@@ -108,7 +108,7 @@ export default function DetailPanel({
               className={`recommendation compact tone-${recommendation.tone}`}
               aria-live="polite"
             >
-              <p className="rec-label">Campus tip</p>
+              <p className="rec-label">Packed tip</p>
               <p className="rec-text">{recommendation.text}</p>
               <p className="rec-detail">{recommendation.detail}</p>
             </section>
