@@ -1,49 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { simHistory } from "@/lib/sim";
 
 const ROWS = simHistory(24);
-const VB = { w: 320, h: 176, l: 46, r: 12, t: 10, b: 30 };
-
-const SLIDES: {
-  key: string;
-  caption: string;
-  yLabel: string;
-  yMin: number;
-  yMax: number;
-  values: number[];
-  format: (v: number) => string;
-}[] = [
-  {
-    key: "people",
-    caption: "People over time",
-    yLabel: "Density",
-    yMin: 0,
-    yMax: 100,
-    values: ROWS.map((r) => r.density),
-    format: (v) => String(Math.round(v)),
-  },
-  {
-    key: "packets",
-    caption: "WiFi packets",
-    yLabel: "Packets",
-    yMin: 0,
-    yMax: 7000,
-    values: ROWS.map((r) => r.packet_count ?? 0),
-    format: (v) => String(Math.round(v)),
-  },
-  {
-    key: "rssi",
-    caption: "Signal strength",
-    yLabel: "dBm",
-    yMin: -90,
-    yMax: -50,
-    values: ROWS.map((r) => r.avg_rssi ?? 0),
-    format: (v) => v.toFixed(0),
-  },
-];
+const VALUES = ROWS.map((r) => r.density);
+const VB = { w: 320, h: 208, l: 40, r: 8, t: 8, b: 34 };
+const Y_MIN = 0;
+const Y_MAX = 100;
 
 function clockLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString([], {
@@ -69,50 +32,26 @@ function plot(values: number[], y0: number, y1: number) {
 }
 
 export default function SimGraphs() {
-  const [slide, setSlide] = useState(0);
-  const current = SLIDES[slide];
-  const { pts, yTicks, xTicks, innerH } = plot(
-    current.values,
-    current.yMin,
-    current.yMax,
-  );
+  const { pts, yTicks, xTicks, innerH } = plot(VALUES, Y_MIN, Y_MAX);
   const baseline = VB.t + innerH;
   const line = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const area = `${pts[0].x.toFixed(1)},${baseline} ${line} ${pts[pts.length - 1].x.toFixed(1)},${baseline}`;
-
-  function prev() {
-    setSlide((s) => (s - 1 + SLIDES.length) % SLIDES.length);
-  }
-  function next() {
-    setSlide((s) => (s + 1) % SLIDES.length);
-  }
+  const yTitleAt = VB.t + innerH / 2;
 
   return (
-    <section className="detail-panel-inner sim-graphs" aria-label="Simulated movement">
-      <div className="detail-header">
-        <div>
-          <p className="detail-kicker">Simulated</p>
-          <h2>{current.caption}</h2>
-        </div>
-      </div>
+    <section className="detail-panel-inner sim-graphs" aria-label="People over time">
       <div className="sim-graphs-stage">
-        <button
-          type="button"
-          className="icon-btn sim-graphs-nav"
-          aria-label="Previous graph"
-          onClick={prev}
-        >
-          <ChevronLeft size={18} />
-        </button>
         <svg
           className="sim-graphs-chart"
           viewBox={`0 0 ${VB.w} ${VB.h}`}
           role="img"
-          aria-label={`${current.caption}, simulated XY plot`}
+          aria-label="People over time, simulated XY plot"
         >
           {yTicks.map((tick, i) => {
             const y =
-              VB.t + (1 - (tick - yTicks[0]) / (yTicks[yTicks.length - 1] - yTicks[0])) * innerH;
+              VB.t +
+              (1 - (tick - yTicks[0]) / (yTicks[yTicks.length - 1] - yTicks[0])) *
+                innerH;
             return (
               <g key={`y-${i}`}>
                 <line
@@ -123,7 +62,7 @@ export default function SimGraphs() {
                   y2={y}
                 />
                 <text className="sim-graphs-tick" x={VB.l - 4} y={y + 3} textAnchor="end">
-                  {current.format(tick)}
+                  {Math.round(tick)}
                 </text>
               </g>
             );
@@ -172,30 +111,23 @@ export default function SimGraphs() {
           <text
             className="sim-graphs-axis-label"
             x={12}
-            y={VB.h / 2}
+            y={yTitleAt}
             textAnchor="middle"
-            transform={`rotate(-90 12 ${VB.h / 2})`}
+            transform={`rotate(-90 12 ${yTitleAt})`}
           >
-            {current.yLabel}
+            People
           </text>
           <text
             className="sim-graphs-axis-label"
-            x={(VB.l + VB.w - VB.r) / 2}
-            y={VB.h - 1}
-            textAnchor="middle"
+            x={VB.w - VB.r}
+            y={VB.h - 2}
+            textAnchor="end"
           >
             Time
           </text>
         </svg>
-        <button
-          type="button"
-          className="icon-btn sim-graphs-nav"
-          aria-label="Next graph"
-          onClick={next}
-        >
-          <ChevronRight size={18} />
-        </button>
       </div>
+      <p className="sim-graphs-title">People over time</p>
     </section>
   );
 }

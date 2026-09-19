@@ -18,9 +18,7 @@ import {
   statusFromDensity,
   trendDirection,
   type LocationDef,
-  type PlaceFields,
   type ReadingState,
-  type Recommendation,
 } from "@/lib/crowd";
 import SimGraphs from "@/components/SimGraphs";
 
@@ -28,10 +26,8 @@ type Props = {
   location: LocationDef;
   selectedId: string | null;
   state: Record<string, ReadingState>;
-  recommendation: Recommendation;
   bestId: string | null;
   demoMode: boolean;
-  editPin: boolean;
   sheetExpanded: boolean;
   meta: string;
   liveLoading: boolean;
@@ -39,7 +35,6 @@ type Props = {
   onCollapse: () => void;
   onExpand: () => void;
   onSlider: (id: string, value: number) => void;
-  onPlaceChange: (place: PlaceFields) => void;
 };
 
 function TrendGlyph({ dir }: { dir: "up" | "down" | "flat" | "none" }) {
@@ -54,10 +49,8 @@ export default function DetailPanel({
   location: loc,
   selectedId,
   state,
-  recommendation,
   bestId,
   demoMode,
-  editPin,
   sheetExpanded,
   meta,
   liveLoading,
@@ -65,7 +58,6 @@ export default function DetailPanel({
   onCollapse,
   onExpand,
   onSlider,
-  onPlaceChange,
 }: Props) {
   const reduceMotion = useReducedMotion();
   const reading = selectedId === loc.id ? state[loc.id] : undefined;
@@ -150,15 +142,6 @@ export default function DetailPanel({
               onPeekClick={sheetExpanded ? undefined : onExpand}
             />
 
-            {demoMode ? (
-              <p
-                className="rec-text peek-tip"
-                onClick={sheetExpanded ? undefined : onExpand}
-              >
-                {recommendation.text}
-              </p>
-            ) : null}
-
             <div className="detail-expanded">
               <div className="detail-chips">
                 {demoMode ? (
@@ -181,17 +164,6 @@ export default function DetailPanel({
                   <span className="sensor-chip best">Best pick</span>
                 ) : null}
               </div>
-
-              {demoMode ? (
-                <section
-                  className={`recommendation compact tone-${recommendation.tone}`}
-                  aria-live="polite"
-                >
-                  <p className="rec-label">Packed tip</p>
-                  <p className="rec-text">{recommendation.text}</p>
-                  <p className="rec-detail">{recommendation.detail}</p>
-                </section>
-              ) : null}
 
               {demoMode ? (
               <p
@@ -231,84 +203,6 @@ export default function DetailPanel({
                     />
                   </label>
                 </div>
-              ) : null}
-
-              {demoMode ? (
-                <div
-                  className={`dev-panel embedded pin-editor${editPin ? " is-open" : ""}`}
-                >
-                <h3>Pin location</h3>
-                <p className="dev-hint">
-                  Place name and Google Maps coordinates. The ESP32 still posts
-                  under the id in location.config.json.
-                </p>
-                <label className="place-field">
-                  <span>Place name</span>
-                  <input
-                    type="text"
-                    value={loc.label}
-                    autoComplete="off"
-                    onChange={(e) =>
-                      onPlaceChange({
-                        id: loc.id,
-                        label: e.target.value,
-                        latitude: loc.coords.lat,
-                        longitude: loc.coords.lng,
-                      })
-                    }
-                  />
-                </label>
-                <label className="place-field">
-                  <span>Latitude</span>
-                  <input
-                    type="number"
-                    step="0.00001"
-                    min={-90}
-                    max={90}
-                    value={loc.coords.lat}
-                    onChange={(e) => {
-                      const latitude = Number(e.target.value);
-                      if (
-                        !Number.isFinite(latitude) ||
-                        latitude < -90 ||
-                        latitude > 90
-                      )
-                        return;
-                      onPlaceChange({
-                        id: loc.id,
-                        label: loc.label,
-                        latitude,
-                        longitude: loc.coords.lng,
-                      });
-                    }}
-                  />
-                </label>
-                <label className="place-field">
-                  <span>Longitude</span>
-                  <input
-                    type="number"
-                    step="0.00001"
-                    min={-180}
-                    max={180}
-                    value={loc.coords.lng}
-                    onChange={(e) => {
-                      const longitude = Number(e.target.value);
-                      if (
-                        !Number.isFinite(longitude) ||
-                        longitude < -180 ||
-                        longitude > 180
-                      )
-                        return;
-                      onPlaceChange({
-                        id: loc.id,
-                        label: loc.label,
-                        latitude: loc.coords.lat,
-                        longitude,
-                      });
-                    }}
-                  />
-                </label>
-              </div>
               ) : null}
 
               {demoMode ? (
