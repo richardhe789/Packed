@@ -59,10 +59,30 @@ describe("buildRecommendation", () => {
     expect(demo.tone).toBe("neutral");
   });
 
-  it('returns similar copy when only one location has density (Live bug)', () => {
+  it("returns single-sensor status copy when only one location has density (Live)", () => {
     const state = emptyState();
     state.dining_hall_main = {
       density: 78,
+      created_at: null,
+      prevDensity: null,
+    };
+    const rec = buildRecommendation(state, false);
+    expect(rec.text).toBe("Dietrick is Busy");
+    expect(rec.detail).toBe(
+      "Only one live sensor is online — can’t compare across campus yet.",
+    );
+    expect(rec.tone).toBe("neutral");
+  });
+
+  it("returns similar copy when two locations differ by less than REC_GAP", () => {
+    const state = emptyState();
+    state.science_quad = {
+      density: 40,
+      created_at: null,
+      prevDensity: null,
+    };
+    state.dining_hall_main = {
+      density: 50,
       created_at: null,
       prevDensity: null,
     };
