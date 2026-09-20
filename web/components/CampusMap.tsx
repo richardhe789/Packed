@@ -39,15 +39,10 @@ function ensureMapLibreWorker() {
   workerConfigured = true;
 }
 
-function mapBottomPad(expanded: boolean, demoMode: boolean) {
+function mapBottomPad(_expanded: boolean, _demoMode: boolean) {
   if (typeof window === "undefined") return 0;
   if (!window.matchMedia("(max-width: 51.1875rem)").matches) return 0;
-  if (expanded) {
-    return demoMode
-      ? Math.min(window.innerHeight * 0.7, 560)
-      : Math.min(window.innerHeight * 0.42, 280);
-  }
-  return 168;
+  return Math.min(window.innerHeight * 0.52, 420);
 }
 
 export default function CampusMap({
