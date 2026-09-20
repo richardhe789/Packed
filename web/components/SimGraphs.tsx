@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { POLL_MS } from "@/lib/crowd";
-import { simHistory, type HistoryPoint } from "@/lib/sim";
+import type { HistoryPoint } from "@/lib/sim";
 import { fetchReadingHistory } from "@/lib/supabase";
 
 const VB = { w: 320, h: 222, l: 40, r: 8, t: 8, b: 48 };
@@ -11,7 +11,6 @@ const Y_MAX = 100;
 
 type Props = {
   locationId: string;
-  live: boolean;
   leading?: ReactNode;
 };
 
@@ -43,17 +42,10 @@ function plot(rows: HistoryPoint[], y0: number, y1: number) {
   return { pts, yTicks, xTicks, innerH };
 }
 
-export default function SimGraphs({ locationId, live, leading }: Props) {
-  const [rows, setRows] = useState<HistoryPoint[]>(() =>
-    live ? [] : simHistory(24),
-  );
+export default function SimGraphs({ locationId, leading }: Props) {
+  const [rows, setRows] = useState<HistoryPoint[]>([]);
 
   useEffect(() => {
-    if (!live) {
-      setRows(simHistory(24));
-      return;
-    }
-
     let cancelled = false;
     const controller = { current: new AbortController() };
 
@@ -79,7 +71,7 @@ export default function SimGraphs({ locationId, live, leading }: Props) {
       controller.current.abort();
       window.clearInterval(intervalId);
     };
-  }, [locationId, live]);
+  }, [locationId]);
 
   if (rows.length < 2) {
     return (
@@ -108,11 +100,7 @@ export default function SimGraphs({ locationId, live, leading }: Props) {
           viewBox={`0 0 ${VB.w} ${VB.h}`}
           preserveAspectRatio="xMidYMid meet"
           role="img"
-          aria-label={
-            live
-              ? "People over time from ESP32 readings"
-              : "People over time, simulated XY plot"
-          }
+          aria-label="People over time from ESP32 readings"
         >
           {yTicks.map((tick, i) => {
             const y =

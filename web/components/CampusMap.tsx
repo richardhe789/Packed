@@ -17,18 +17,44 @@ import {
 } from "@/lib/crowd";
 
 type Props = {
+  locations: LocationDef[];
   location: LocationDef;
   state: Record<string, ReadingState>;
   selectedId: string | null;
   bestId: string | null;
-  demoMode: boolean;
-  sheetExpanded: boolean;
   onSelect: (id: string) => void;
 };
 
 type PinScreen = { id: string; x: number; y: number };
 
-const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const OPENFREEMAP_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
+const OPENFREEMAP_DARK = "https://tiles.openfreemap.org/styles/fiord";
+
+function openFreeMapStyle(): string {
+  return document.documentElement.getAttribute("data-theme") === "dark"
+    ? OPENFREEMAP_DARK
+    : OPENFREEMAP_LIGHT;
+}
+
+function ensureBuildings3d(map: MapLibreMap) {
+  if (map.getLayer("building-3d") || !map.getSource("openmaptiles")) return;
+  map.addLayer({
+    id: "building-3d",
+    type: "fill-extrusion",
+    source: "openmaptiles",
+    "source-layer": "building",
+    minzoom: 14,
+    paint: {
+      "fill-extrusion-base": ["get", "render_min_height"],
+      "fill-extrusion-color": "#8b95a8",
+      "fill-extrusion-height": ["get", "render_height"],
+      "fill-extrusion-opacity": 0.82,
+    },
+  });
+  if (map.getLayer("building")) {
+    map.setLayoutProperty("building", "visibility", "none");
+  }
+}
 
 // Next/Turbopack breaks MapLibre's bundled worker → blank basemap, pins still work.
 // Serve worker + shared sibling from /public (both required; worker imports the sibling).
@@ -39,19 +65,18 @@ function ensureMapLibreWorker() {
   workerConfigured = true;
 }
 
-function mapBottomPad(_expanded: boolean, _demoMode: boolean) {
+function mapBottomPad() {
   if (typeof window === "undefined") return 0;
   if (!window.matchMedia("(max-width: 51.1875rem)").matches) return 0;
   return Math.min(window.innerHeight * 0.52, 420);
 }
 
 export default function CampusMap({
+  locations,
   location,
   state,
   selectedId,
   bestId,
-  demoMode,
-  sheetExpanded,
   onSelect,
 }: Props) {
   const reduceMotion = useReducedMotion();
@@ -77,7 +102,7 @@ export default function CampusMap({
     let cancelled = false;
     const map = new MapLibreMap({
       container: el,
-      style: OPENFREEMAP_STYLE_URL,
+      style: openFreeMapStyle(),
       center: [location.coords.lng, location.coords.lat],
       zoom: CAMPUS_VIEW.zoom,
       attributionControl: { compact: true },
@@ -117,6 +142,9 @@ export default function CampusMap({
       markReady();
     };
 
+    map.on("load", () => {
+      if (!cancelled) ensureBuildings3d(map);
+    });
     map.once("load", markReadyOnce);
 
     // Pins even if style paint is slow
@@ -141,15 +169,58 @@ export default function CampusMap({
     };
   }, []);
 
+  useEffect(() => {
+    if (!mapRef.current || mapEpoch === 0) return;
+
+    let current = openFreeMapStyle();
+
+    function applyPad() {
+      const map = mapRef.current;
+      if (!map) return;
+      map.setPadding({
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: mapBottomPad(),
+      });
+    }
+
+    function onTheme() {
+      const map = mapRef.current;
+      if (!map) return;
+      const next = openFreeMapStyle();
+      if (next === current) return;
+      current = next;
+      map.setStyle(next);
+      map.once("idle", () => {
+        const live = mapRef.current;
+        if (!live) return;
+        ensureBuildings3d(live);
+        applyPad();
+      });
+    }
+
+    const mo = new MutationObserver(onTheme);
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => mo.disconnect();
+  }, [mapEpoch]);
+
   // Project building coords → screen pixels (pins sit above vignette, outside MapLibre DOM).
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapEpoch === 0) return;
 
     const project = () => {
+      const live = mapRef.current;
+      if (!live) return;
       const next: PinScreen[] = [];
-      const p = map.project([location.coords.lng, location.coords.lat]);
-      next.push({ id: location.id, x: p.x, y: p.y });
+      for (const loc of locations) {
+        const p = live.project([loc.coords.lng, loc.coords.lat]);
+        next.push({ id: loc.id, x: p.x, y: p.y });
+      }
       setPins(next);
     };
 
@@ -163,7 +234,7 @@ export default function CampusMap({
       map.off("zoom", project);
       map.off("resize", project);
     };
-  }, [mapEpoch, location.coords.lat, location.coords.lng, location.id]);
+  }, [mapEpoch, locations]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -178,32 +249,35 @@ export default function CampusMap({
     const map = mapRef.current;
     if (!map || mapEpoch === 0) return;
     const apply = () => {
-      map.setPadding({
+      const live = mapRef.current;
+      if (!live) return;
+      live.setPadding({
         top: 0,
         left: 0,
         right: 0,
-        bottom: mapBottomPad(sheetExpanded, demoMode),
+        bottom: mapBottomPad(),
       });
     };
     apply();
     window.addEventListener("resize", apply);
     return () => window.removeEventListener("resize", apply);
-  }, [mapEpoch, sheetExpanded, demoMode]);
+  }, [mapEpoch]);
 
   return (
     <div className="map-canvas">
       <div ref={containerRef} className="map-container" />
 
-      <div className="map-pins" aria-label="Sensor location">
+      <div className="map-pins" aria-label="Dining locations">
         {pins.map((pin) => {
-          const loc = pin.id === location.id ? location : null;
+          const loc = locations.find((l) => l.id === pin.id);
           if (!loc) return null;
           const reading = state[loc.id];
           const crowd = statusFromDensity(reading?.density ?? null);
           const selected = loc.id === selectedId;
           const best = loc.id === bestId;
+          const pending = !loc.liveSensor;
           const pulse =
-            !demoMode &&
+            !pending &&
             liveSourceKind(reading?.src, reading?.created_at ?? null, Date.now()) ===
               "live" &&
             !reduceMotion;
@@ -212,12 +286,16 @@ export default function CampusMap({
             <button
               key={loc.id}
               type="button"
-              className={`geo-pin status-${crowd.key}${selected ? " is-selected" : ""}${best ? " is-best" : ""}${pulse ? " is-live" : ""}`}
+              className={`geo-pin status-${crowd.key}${selected ? " is-selected" : ""}${best ? " is-best" : ""}${pulse ? " is-live" : ""}${pending ? " is-pending" : ""}`}
               style={{
                 left: pin.x,
                 top: pin.y,
               }}
-              aria-label={`${loc.label}, ${crowd.label}`}
+              aria-label={
+                pending
+                  ? `${loc.label}, coming soon`
+                  : `${loc.label}, ${crowd.label}`
+              }
               onClick={() => onSelect(loc.id)}
             >
               <span className="geo-pin-dot" />

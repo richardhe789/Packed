@@ -1,27 +1,25 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LOCATIONS,
   PLACE_STORAGE_KEY,
   POLL_MS,
   SENSOR_LOCATION,
+  allLocations,
   buildRecommendation,
   emptyState,
   liveSourceKind,
-  locationFromPlace,
   parsePlaceFields,
   placeFromSensor,
   quietestLocationId,
-  seedDemoState,
-  wantsDemoFromSearch,
   type PlaceFields,
   type ReadingState,
 } from "@/lib/crowd";
 import { fetchLatestReadings } from "@/lib/supabase";
 import DetailPanel from "@/components/DetailPanel";
+import LocationSearch from "@/components/LocationSearch";
 import TopBar from "@/components/TopBar";
 
 const CampusMap = dynamic(() => import("@/components/CampusMap"), {
@@ -37,67 +35,21 @@ function isAbortError(err: unknown): boolean {
 }
 
 export default function PackedApp() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const search = searchParams.toString() ? `?${searchParams.toString()}` : "";
-
-  const initialDemo = wantsDemoFromSearch(search);
   const [place, setPlace] = useState<PlaceFields>(placeFromSensor);
-  const liveLoc = useMemo(() => locationFromPlace(place), [place]);
-  const [demoMode, setDemoMode] = useState(initialDemo);
-  const [state, setState] = useState<Record<string, ReadingState>>(() =>
-    initialDemo ? seedDemoState() : emptyState(),
-  );
-  const [meta, setMeta] = useState(() =>
-    initialDemo
-      ? "Demo · one sensor pin · scrub density in the panel"
-      : "Live · fetching…",
-  );
-  const [liveLoading, setLiveLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(
     SENSOR_LOCATION.id,
   );
+  const locations = useMemo(() => allLocations(place), [place]);
+  const selectedLoc = useMemo(
+    () => locations.find((l) => l.id === selectedId) ?? locations[0],
+    [locations, selectedId],
+  );
+  const [state, setState] = useState<Record<string, ReadingState>>(emptyState);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const [revealSeq, setRevealSeq] = useState(0);
 
   const liveGenerationRef = useRef(0);
   const liveAbortRef = useRef<AbortController | null>(null);
-
-  const syncUrl = useCallback(
-    (demo: boolean) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (demo) {
-        params.set("demo", "1");
-        params.delete("live");
-      } else {
-        params.set("live", "1");
-        params.delete("demo");
-      }
-      const q = params.toString();
-      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
-    },
-    [pathname, router, searchParams],
-  );
-
-  const enterDemo = useCallback(() => {
-    const seeded = seedDemoState(new Date().toISOString());
-    setDemoMode(true);
-    setLiveLoading(false);
-    setState(seeded);
-    setMeta("Demo · one sensor pin · scrub density in the panel");
-    setSelectedId(SENSOR_LOCATION.id);
-    syncUrl(true);
-  }, [syncUrl]);
-
-  const enterLive = useCallback(() => {
-    setDemoMode(false);
-    setState(emptyState());
-    setMeta("Live · fetching…");
-    setLiveLoading(true);
-    setSelectedId(SENSOR_LOCATION.id);
-    syncUrl(false);
-  }, [syncUrl]);
 
   const [placeReady, setPlaceReady] = useState(false);
 
@@ -120,26 +72,6 @@ export default function PackedApp() {
   }, [place, placeReady]);
 
   useEffect(() => {
-    if (!demoMode) return;
-    setState((prev) => {
-      const needsStamp = Object.values(prev).some(
-        (s) => s.density != null && s.created_at == null,
-      );
-      if (!needsStamp) return prev;
-      const now = new Date().toISOString();
-      const next = { ...prev };
-      for (const id of Object.keys(next)) {
-        if (next[id].density != null && next[id].created_at == null) {
-          next[id] = { ...next[id], created_at: now };
-        }
-      }
-      return next;
-    });
-  }, [demoMode]);
-
-  useEffect(() => {
-    if (demoMode) return;
-
     const runPoll = async () => {
       liveAbortRef.current?.abort();
       const controller = new AbortController();
@@ -147,7 +79,6 @@ export default function PackedApp() {
       const signal = controller.signal;
       const gen = ++liveGenerationRef.current;
 
-      setLiveLoading(true);
       try {
         const liveIds = LOCATIONS.filter((l) => l.liveSensor).map((l) => l.id);
         const results = await Promise.all(
@@ -175,34 +106,10 @@ export default function PackedApp() {
           }
           return next;
         });
-        const latestRow = results[0]?.latest ?? null;
-        const kind = liveSourceKind(
-          latestRow?.src,
-          latestRow?.created_at ?? null,
-          Date.now(),
-        );
-        if (kind === "sim") {
-          setMeta("Simulated · sim_readings / src=sim · not a plugged-in ESP32");
-        } else if (kind === "stale") {
-          setMeta(
-            "Last ESP32 row in readings · sensor not posting · dashboard still polls",
-          );
-        } else if (kind === "none") {
-          setMeta(`No ESP32 rows in readings yet · polling every ${POLL_MS / 1000}s`);
-        } else {
-          setMeta(`ESP32 posting · dashboard poll every ${POLL_MS / 1000}s`);
-        }
       } catch (err) {
         if (isAbortError(err) || signal.aborted) return;
         if (gen !== liveGenerationRef.current) return;
         console.error(err);
-        setMeta(
-          `Live error: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      } finally {
-        if (gen === liveGenerationRef.current) {
-          setLiveLoading(false);
-        }
       }
     };
 
@@ -246,72 +153,57 @@ export default function PackedApp() {
       liveAbortRef.current?.abort();
       liveAbortRef.current = null;
     };
-  }, [demoMode]);
+  }, []);
 
-  const recommendation = useMemo(
-    () => buildRecommendation(state, demoMode),
-    [state, demoMode],
-  );
+  const recommendation = useMemo(() => buildRecommendation(state), [state]);
 
   const bestId = useMemo(() => {
     if (recommendation.tone !== "go") return null;
     return quietestLocationId(state);
   }, [recommendation.tone, state]);
 
-  function onSlider(id: string, value: number) {
-    setState((prev) => ({
-      ...prev,
-      [id]: {
-        prevDensity: prev[id].density,
-        density: value,
-        created_at: new Date().toISOString(),
-        avgRssi: prev[id].avgRssi,
-        packetCount: prev[id].packetCount,
-        src: prev[id].src,
-      },
-    }));
-  }
-
   return (
-    <div
-      className="map-shell"
-      data-sheet-expanded={sheetExpanded ? "true" : "false"}
-      data-demo={demoMode ? "true" : "false"}
-    >
-      <TopBar
-        demoMode={demoMode}
-        onDemo={enterDemo}
-        onLive={enterLive}
-      />
+    <div className="map-shell">
+      <aside className="app-sidebar">
+        <TopBar
+          espKind={liveSourceKind(
+            state[SENSOR_LOCATION.id]?.src,
+            state[SENSOR_LOCATION.id]?.created_at ?? null,
+            Date.now(),
+          )}
+        />
+
+        <DetailPanel
+          location={selectedLoc}
+          selectedId={selectedId}
+          state={state}
+          bestId={bestId}
+          sheetExpanded={sheetExpanded}
+          onExpand={() => setSheetExpanded(true)}
+          revealSeq={revealSeq}
+        />
+      </aside>
 
       <div className="map-stage">
-        <CampusMap
-          location={liveLoc}
-          state={state}
-          selectedId={selectedId}
-          bestId={bestId}
-          demoMode={demoMode}
-          sheetExpanded={sheetExpanded}
-          onSelect={(id) => {
+        <LocationSearch
+          locations={locations}
+          onPick={(id) => {
             setSelectedId(id);
             setSheetExpanded(true);
             setRevealSeq((n) => n + 1);
           }}
         />
-
-        <DetailPanel
-          location={liveLoc}
-          selectedId={selectedId}
+        <CampusMap
+          locations={locations}
+          location={selectedLoc}
           state={state}
+          selectedId={selectedId}
           bestId={bestId}
-          demoMode={demoMode}
-          sheetExpanded={sheetExpanded}
-          meta={meta}
-          liveLoading={liveLoading}
-          onCollapse={() => setSheetExpanded(false)}
-          onExpand={() => setSheetExpanded(true)}
-          onSlider={onSlider}
-          revealSeq={revealSeq}
+          onSelect={(id) => {
+            setSelectedId(id);
+            setSheetExpanded(true);
+            setRevealSeq((n) => n + 1);
+          }}
         />
       </div>
     </div>
