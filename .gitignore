@@ -16,5 +16,6 @@ firmware/compile_commands.json
 .env.*
 !.env.example
 !web/.env.example
+!web/.env.production
 web/.env.local
 *.pem
