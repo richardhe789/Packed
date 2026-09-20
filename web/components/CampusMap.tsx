@@ -170,12 +170,13 @@ export default function CampusMap({
   }, []);
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || mapEpoch === 0) return;
+    if (!mapRef.current || mapEpoch === 0) return;
 
     let current = openFreeMapStyle();
 
     function applyPad() {
+      const map = mapRef.current;
+      if (!map) return;
       map.setPadding({
         top: 0,
         left: 0,
@@ -185,12 +186,16 @@ export default function CampusMap({
     }
 
     function onTheme() {
+      const map = mapRef.current;
+      if (!map) return;
       const next = openFreeMapStyle();
       if (next === current) return;
       current = next;
       map.setStyle(next);
       map.once("idle", () => {
-        ensureBuildings3d(map);
+        const live = mapRef.current;
+        if (!live) return;
+        ensureBuildings3d(live);
         applyPad();
       });
     }
@@ -209,9 +214,11 @@ export default function CampusMap({
     if (!map || mapEpoch === 0) return;
 
     const project = () => {
+      const live = mapRef.current;
+      if (!live) return;
       const next: PinScreen[] = [];
       for (const loc of locations) {
-        const p = map.project([loc.coords.lng, loc.coords.lat]);
+        const p = live.project([loc.coords.lng, loc.coords.lat]);
         next.push({ id: loc.id, x: p.x, y: p.y });
       }
       setPins(next);
@@ -242,7 +249,9 @@ export default function CampusMap({
     const map = mapRef.current;
     if (!map || mapEpoch === 0) return;
     const apply = () => {
-      map.setPadding({
+      const live = mapRef.current;
+      if (!live) return;
+      live.setPadding({
         top: 0,
         left: 0,
         right: 0,
