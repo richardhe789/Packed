@@ -34,7 +34,7 @@ static const uint8_t BASELINE_WINDOWS = 3;
 #ifndef SHORT_WINDOWS
 static const unsigned long WINDOW_MS = 5UL * 60UL * 1000UL;
 #else
-static const unsigned long WINDOW_MS = 30UL * 1000UL;  // 30s for bench testing
+static const unsigned long WINDOW_MS = 15UL * 1000UL;  // 15s for bench testing
 #endif
 
 // Sniff channel: 0 = use the channel of the connected hotspot AP.
