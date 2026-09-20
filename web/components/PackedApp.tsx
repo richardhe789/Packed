@@ -58,7 +58,8 @@ export default function PackedApp() {
   const [selectedId, setSelectedId] = useState<string | null>(
     SENSOR_LOCATION.id,
   );
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(true);
+  const [revealSeq, setRevealSeq] = useState(0);
 
   const liveGenerationRef = useRef(0);
   const liveAbortRef = useRef<AbortController | null>(null);
@@ -294,6 +295,7 @@ export default function PackedApp() {
           onSelect={(id) => {
             setSelectedId(id);
             setSheetExpanded(true);
+            setRevealSeq((n) => n + 1);
           }}
         />
 
@@ -306,10 +308,10 @@ export default function PackedApp() {
           sheetExpanded={sheetExpanded}
           meta={meta}
           liveLoading={liveLoading}
-          onClose={() => setSelectedId(null)}
           onCollapse={() => setSheetExpanded(false)}
           onExpand={() => setSheetExpanded(true)}
           onSlider={onSlider}
+          revealSeq={revealSeq}
         />
       </div>
     </div>

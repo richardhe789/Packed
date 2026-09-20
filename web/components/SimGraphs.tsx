@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { POLL_MS } from "@/lib/crowd";
 import { simHistory, type HistoryPoint } from "@/lib/sim";
 import { fetchReadingHistory } from "@/lib/supabase";
 
-const VB = { w: 320, h: 208, l: 40, r: 8, t: 8, b: 34 };
+const VB = { w: 320, h: 222, l: 40, r: 8, t: 8, b: 48 };
 const Y_MIN = 0;
 const Y_MAX = 100;
 
 type Props = {
   locationId: string;
   live: boolean;
+  leading?: ReactNode;
 };
 
 function clockLabel(iso: string): string {
@@ -42,7 +43,7 @@ function plot(rows: HistoryPoint[], y0: number, y1: number) {
   return { pts, yTicks, xTicks, innerH };
 }
 
-export default function SimGraphs({ locationId, live }: Props) {
+export default function SimGraphs({ locationId, live, leading }: Props) {
   const [rows, setRows] = useState<HistoryPoint[]>(() =>
     live ? [] : simHistory(24),
   );
@@ -83,6 +84,7 @@ export default function SimGraphs({ locationId, live }: Props) {
   if (rows.length < 2) {
     return (
       <section className="detail-panel-inner sim-graphs" aria-label="People over time">
+        {leading}
         <p className="sim-graphs-title">People over time</p>
         <p className="dev-hint">Need at least two ESP32 readings to graph.</p>
       </section>
@@ -99,10 +101,12 @@ export default function SimGraphs({ locationId, live }: Props) {
 
   return (
     <section className="detail-panel-inner sim-graphs" aria-label="People over time">
+      {leading}
       <div className="sim-graphs-stage">
         <svg
           className="sim-graphs-chart"
           viewBox={`0 0 ${VB.w} ${VB.h}`}
+          preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label={
             live
@@ -142,7 +146,7 @@ export default function SimGraphs({ locationId, live }: Props) {
               <text
                 className="sim-graphs-tick"
                 x={tick.x}
-                y={VB.h - 8}
+                y={baseline + 14}
                 textAnchor="middle"
               >
                 {clockLabel(tick.iso)}

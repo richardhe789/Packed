@@ -14,9 +14,15 @@ function readingsTable(): "sim_readings" | "readings" {
   return USE_SIM_READINGS ? "sim_readings" : "readings";
 }
 
+/** Publishable anon key — same as firmware. Lets Vercel Live work without dashboard env. */
+const FALLBACK_SUPABASE_URL = "https://myjfbuathehfghagbnot.supabase.co";
+const FALLBACK_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15amZidWF0aGVoZmdoYWdibm90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3ODIzOTIsImV4cCI6MjEwNTM1ODM5Mn0.Wa8W2VWnlR1Mx6o_1q0NKsed_5Gp8f1MRNVg1LrFSQM";
+
 export function getSupabaseConfig(): { url: string; anonKey: string } {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_SUPABASE_URL;
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_SUPABASE_ANON_KEY;
   if (!url || !anonKey || anonKey.includes("YOUR_")) {
     throw new Error(
       "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local",

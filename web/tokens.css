@@ -185,7 +185,8 @@
   --panel-width: min(360px, 92vw);
   --topbar-h: 88px;
   --page-gutter: var(--space-md);
-  --sheet-peek-h: 10.5rem;
+  --sheet-peek-h: 18rem;
+  --deck-peek: 2.75rem;
   --map-bottom-pad: 0px;
 }
 
