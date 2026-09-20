@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Activity,
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
   Minus,
   Radio,
   Wifi,
-  X,
 } from "lucide-react";
 import {
   formatReadingAge,
@@ -31,10 +32,10 @@ type Props = {
   sheetExpanded: boolean;
   meta: string;
   liveLoading: boolean;
-  onClose: () => void;
   onCollapse: () => void;
   onExpand: () => void;
   onSlider: (id: string, value: number) => void;
+  revealSeq: number;
 };
 
 function TrendGlyph({ dir }: { dir: "up" | "down" | "flat" | "none" }) {
@@ -43,6 +44,43 @@ function TrendGlyph({ dir }: { dir: "up" | "down" | "flat" | "none" }) {
     return <ArrowDownRight size={16} aria-label="trending down" />;
   if (dir === "flat") return <ArrowRight size={16} aria-label="stable" />;
   return <Minus size={16} aria-hidden />;
+}
+
+function Dock({
+  retracted,
+  label,
+  onToggle,
+  front,
+  onBringFront,
+  children,
+}: {
+  retracted: boolean;
+  label: string;
+  onToggle: () => void;
+  front: boolean;
+  onBringFront: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`detail-dock${retracted ? " is-retracted" : ""}${front ? " is-front" : " is-back"}`}
+      onClick={front ? undefined : onBringFront}
+    >
+      <button
+        type="button"
+        className="dock-toggle"
+        aria-expanded={!retracted}
+        aria-label={retracted ? `Show ${label}` : `Hide ${label}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+      >
+        {retracted ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+      </button>
+      {children}
+    </div>
+  );
 }
 
 export default function DetailPanel({
@@ -54,14 +92,23 @@ export default function DetailPanel({
   sheetExpanded,
   meta,
   liveLoading,
-  onClose,
   onCollapse,
   onExpand,
   onSlider,
+  revealSeq,
 }: Props) {
   const reduceMotion = useReducedMotion();
   const reading = selectedId === loc.id ? state[loc.id] : undefined;
   const dragStartY = useRef<number | null>(null);
+  const [locRetracted, setLocRetracted] = useState(false);
+  const [graphsRetracted, setGraphsRetracted] = useState(false);
+  const [front, setFront] = useState<"location" | "graphs">("location");
+
+  useEffect(() => {
+    setLocRetracted(false);
+    setGraphsRetracted(false);
+    setFront("location");
+  }, [revealSeq, loc.id]);
 
   function onHandlePointerDown(e: React.PointerEvent) {
     dragStartY.current = e.clientY;
@@ -73,11 +120,6 @@ export default function DetailPanel({
     if (start == null) return;
     const dy = e.clientY - start;
     if (dy < -40) onExpand();
-    else if (dy > 40) onCollapse();
-    else if (Math.abs(dy) < 8) {
-      if (sheetExpanded) onCollapse();
-      else onExpand();
-    }
   }
 
   return (
@@ -86,13 +128,21 @@ export default function DetailPanel({
         <motion.aside
           key={loc.id}
           className={`detail-panel${sheetExpanded ? " is-expanded" : " is-peek"}`}
+          data-front={front}
           initial={reduceMotion ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={reduceMotion ? undefined : { opacity: 0, y: 6 }}
           transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           aria-label={`${loc.label} details`}
         >
-          <div className="detail-panel-inner">
+            <Dock
+              retracted={locRetracted}
+              label="location"
+              front={front === "location"}
+              onBringFront={() => setFront("location")}
+              onToggle={() => setLocRetracted((v) => !v)}
+            >
+            <div className="detail-panel-inner">
             <button
               type="button"
               className="sheet-handle"
@@ -117,22 +167,6 @@ export default function DetailPanel({
                 <p className="detail-kicker">Location</p>
                 <h2>{loc.label}</h2>
               </div>
-              <button
-                type="button"
-                className="icon-btn sheet-close-desktop"
-                onClick={onClose}
-                aria-label="Close panel"
-              >
-                <X size={18} />
-              </button>
-              <button
-                type="button"
-                className="icon-btn sheet-collapse-mobile"
-                onClick={onCollapse}
-                aria-label="Collapse panel"
-              >
-                <X size={18} />
-              </button>
             </div>
 
             <DensityBlock
@@ -211,8 +245,33 @@ export default function DetailPanel({
               </p>
               ) : null}
             </div>
-          </div>
-          <SimGraphs locationId={loc.id} live={!demoMode} />
+            </div>
+            </Dock>
+            <Dock
+              retracted={graphsRetracted}
+              label="people over time"
+              front={front === "graphs"}
+              onBringFront={() => {
+                setFront("graphs");
+                onExpand();
+              }}
+              onToggle={() => setGraphsRetracted((v) => !v)}
+            >
+            <SimGraphs
+              locationId={loc.id}
+              live={!demoMode}
+              leading={
+                <button
+                  type="button"
+                  className="sheet-handle"
+                  aria-label={sheetExpanded ? "Collapse details" : "Expand details"}
+                  aria-expanded={sheetExpanded}
+                  onPointerDown={onHandlePointerDown}
+                  onPointerUp={onHandlePointerUp}
+                />
+              }
+            />
+            </Dock>
         </motion.aside>
       ) : null}
     </AnimatePresence>

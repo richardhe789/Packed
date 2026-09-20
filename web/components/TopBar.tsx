@@ -69,18 +69,12 @@ export default function TopBar({
       <div className="topbar-actions" ref={wrapRef}>
         <button
           type="button"
-          className={`theme-switch${theme === "dark" ? " is-dark" : ""}`}
-          role="switch"
-          aria-checked={theme === "dark"}
+          className="icon-btn"
           aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           title={theme === "dark" ? "Light mode" : "Dark mode"}
           onClick={() => setTheme((t) => toggleTheme(t))}
         >
-          <span className="theme-switch-track" aria-hidden>
-            <Sun size={12} className="theme-switch-icon theme-switch-sun" />
-            <Moon size={12} className="theme-switch-icon theme-switch-moon" />
-          </span>
-          <span className="theme-switch-thumb" aria-hidden />
+          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
         <div className="mode-toggle desktop-mode" role="group" aria-label="Data mode">
