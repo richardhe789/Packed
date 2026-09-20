@@ -1,4 +1,4 @@
-# Packed — Skip the packed line.
+# Packed — Know before you walk.
 
 <p align="center">
   <img src="./art/packed-logo.png" width="200" height="200" alt="Packed">
