@@ -465,6 +465,27 @@ body {
   --pin-color: var(--color-muted-fg);
 }
 
+.geo-pin.is-pending {
+  --pin-color: oklch(72% 0 0);
+  filter: grayscale(1) drop-shadow(0 3px 6px var(--shadow-cast));
+}
+
+.geo-pin.is-pending .geo-pin-dot {
+  background: oklch(78% 0 0);
+  border-color: oklch(90% 0 0);
+  box-shadow: 0 0 0 2px oklch(62% 0 0);
+}
+
+.geo-pin.is-pending .geo-pin-label {
+  color: oklch(48% 0 0);
+  background: oklch(90% 0 0);
+  border-color: oklch(70% 0 0);
+}
+
+.geo-pin.is-pending.is-selected .geo-pin-label {
+  background: oklch(86% 0 0);
+}
+
 .geo-pin.is-selected {
   transform: translate(-50%, calc(-100% - 6px));
 }
@@ -1141,7 +1162,7 @@ body {
   }
 
   .map-fade-bottom {
-    height: calc(var(--map-bottom-pad) + 24px);
+    height: 48px;
   }
 
   .maplibregl-ctrl-bottom-left {
@@ -1159,7 +1180,7 @@ body {
     max-height: var(--map-bottom-pad);
     padding: 0;
     overflow: visible;
-    background: var(--color-paper);
+    background: transparent;
     border: 0;
     box-shadow: none;
     --deck-peek: 2.75rem;

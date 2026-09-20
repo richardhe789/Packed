@@ -17,6 +17,7 @@ import {
 } from "@/lib/crowd";
 
 type Props = {
+  locations: LocationDef[];
   location: LocationDef;
   state: Record<string, ReadingState>;
   selectedId: string | null;
@@ -46,6 +47,7 @@ function mapBottomPad(_expanded: boolean, _demoMode: boolean) {
 }
 
 export default function CampusMap({
+  locations,
   location,
   state,
   selectedId,
@@ -148,8 +150,10 @@ export default function CampusMap({
 
     const project = () => {
       const next: PinScreen[] = [];
-      const p = map.project([location.coords.lng, location.coords.lat]);
-      next.push({ id: location.id, x: p.x, y: p.y });
+      for (const loc of locations) {
+        const p = map.project([loc.coords.lng, loc.coords.lat]);
+        next.push({ id: loc.id, x: p.x, y: p.y });
+      }
       setPins(next);
     };
 
@@ -163,7 +167,7 @@ export default function CampusMap({
       map.off("zoom", project);
       map.off("resize", project);
     };
-  }, [mapEpoch, location.coords.lat, location.coords.lng, location.id]);
+  }, [mapEpoch, locations]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -194,15 +198,17 @@ export default function CampusMap({
     <div className="map-canvas">
       <div ref={containerRef} className="map-container" />
 
-      <div className="map-pins" aria-label="Sensor location">
+      <div className="map-pins" aria-label="Dining locations">
         {pins.map((pin) => {
-          const loc = pin.id === location.id ? location : null;
+          const loc = locations.find((l) => l.id === pin.id);
           if (!loc) return null;
           const reading = state[loc.id];
           const crowd = statusFromDensity(reading?.density ?? null);
           const selected = loc.id === selectedId;
           const best = loc.id === bestId;
+          const pending = !loc.liveSensor;
           const pulse =
+            !pending &&
             !demoMode &&
             liveSourceKind(reading?.src, reading?.created_at ?? null, Date.now()) ===
               "live" &&
@@ -212,12 +218,16 @@ export default function CampusMap({
             <button
               key={loc.id}
               type="button"
-              className={`geo-pin status-${crowd.key}${selected ? " is-selected" : ""}${best ? " is-best" : ""}${pulse ? " is-live" : ""}`}
+              className={`geo-pin status-${crowd.key}${selected ? " is-selected" : ""}${best ? " is-best" : ""}${pulse ? " is-live" : ""}${pending ? " is-pending" : ""}`}
               style={{
                 left: pin.x,
                 top: pin.y,
               }}
-              aria-label={`${loc.label}, ${crowd.label}`}
+              aria-label={
+                pending
+                  ? `${loc.label}, coming soon`
+                  : `${loc.label}, ${crowd.label}`
+              }
               onClick={() => onSelect(loc.id)}
             >
               <span className="geo-pin-dot" />

@@ -1,3 +1,4 @@
+import { CAMPUS_SITES } from "@/lib/campus-sites";
 import { SENSOR_LOCATION } from "@/lib/location.generated";
 
 export type LocationDef = {
@@ -30,11 +31,11 @@ export type Recommendation = {
   tone: "go" | "neutral";
 };
 
-/** Map camera follows the one configured sensor pin. */
+/** Map camera starts on the live ESP pin, zoomed to show nearby dining halls. */
 export const CAMPUS_VIEW = {
   longitude: SENSOR_LOCATION.longitude,
   latitude: SENSOR_LOCATION.latitude,
-  zoom: 16.6,
+  zoom: 15.4,
 } as const;
 
 export type PlaceFields = {
@@ -64,8 +65,22 @@ export function locationFromPlace(place: PlaceFields): LocationDef {
   };
 }
 
-/** One pin. Name + coordinates come from location.config.json (or the in-app editor). */
-export const LOCATIONS: LocationDef[] = [locationFromPlace(placeFromSensor())];
+export function allLocations(place: PlaceFields): LocationDef[] {
+  const live = locationFromPlace(place);
+  const extras: LocationDef[] = CAMPUS_SITES.filter((s) => s.id !== live.id).map(
+    (s) => ({
+      id: s.id,
+      label: s.label,
+      shortLabel: s.shortLabel,
+      liveSensor: s.liveSensor,
+      coords: { lat: s.coords.lat, lng: s.coords.lng },
+    }),
+  );
+  return [live, ...extras];
+}
+
+/** Live ESP pin first, then halls from campus-sites.ts. */
+export const LOCATIONS: LocationDef[] = allLocations(placeFromSensor());
 
 export const POLL_MS = 5_000;
 export const REC_GAP = 20;
@@ -104,6 +119,16 @@ export function emptyState(): Record<string, ReadingState> {
 export function seedDemoState(at: string | null = null): Record<string, ReadingState> {
   const state: Record<string, ReadingState> = {};
   for (const loc of LOCATIONS) {
+    if (!loc.liveSensor) {
+      state[loc.id] = {
+        density: null,
+        created_at: null,
+        prevDensity: null,
+        avgRssi: null,
+        packetCount: null,
+      };
+      continue;
+    }
     const d = 62;
     state[loc.id] = {
       density: d,
@@ -141,6 +166,7 @@ export function quietestLocationId(
   let best: string | null = null;
   let bestD = Infinity;
   for (const loc of LOCATIONS) {
+    if (!loc.liveSensor) continue;
     const d = state[loc.id].density;
     if (d != null && d < bestD) {
       bestD = d;
@@ -154,10 +180,12 @@ export function buildRecommendation(
   state: Record<string, ReadingState>,
   demoMode: boolean,
 ): Recommendation {
-  const scored = LOCATIONS.map((loc) => ({
-    loc,
-    density: state[loc.id].density,
-  })).filter(
+  const scored = LOCATIONS.filter((loc) => loc.liveSensor)
+    .map((loc) => ({
+      loc,
+      density: state[loc.id].density,
+    }))
+    .filter(
     (x): x is { loc: LocationDef; density: number } => x.density != null,
   );
 

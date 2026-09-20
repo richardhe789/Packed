@@ -7,10 +7,10 @@ import {
   PLACE_STORAGE_KEY,
   POLL_MS,
   SENSOR_LOCATION,
+  allLocations,
   buildRecommendation,
   emptyState,
   liveSourceKind,
-  locationFromPlace,
   parsePlaceFields,
   placeFromSensor,
   quietestLocationId,
@@ -36,13 +36,21 @@ function isAbortError(err: unknown): boolean {
 export default function PackedApp() {
   const demoMode = false;
   const [place, setPlace] = useState<PlaceFields>(placeFromSensor);
-  const liveLoc = useMemo(() => locationFromPlace(place), [place]);
-  const [state, setState] = useState<Record<string, ReadingState>>(emptyState);
-  const [meta, setMeta] = useState("Live · fetching…");
-  const [liveLoading, setLiveLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(
     SENSOR_LOCATION.id,
   );
+  const locations = useMemo(() => allLocations(place), [place]);
+  const liveLoc = useMemo(
+    () => locations.find((l) => l.id === SENSOR_LOCATION.id) ?? locations[0],
+    [locations],
+  );
+  const selectedLoc = useMemo(
+    () => locations.find((l) => l.id === selectedId) ?? liveLoc,
+    [locations, selectedId, liveLoc],
+  );
+  const [state, setState] = useState<Record<string, ReadingState>>(emptyState);
+  const [meta, setMeta] = useState("Live · fetching…");
+  const [liveLoading, setLiveLoading] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const [revealSeq, setRevealSeq] = useState(0);
 
@@ -218,7 +226,8 @@ export default function PackedApp() {
 
       <div className="map-stage">
         <CampusMap
-          location={liveLoc}
+          locations={locations}
+          location={selectedLoc}
           state={state}
           selectedId={selectedId}
           bestId={bestId}
@@ -232,7 +241,7 @@ export default function PackedApp() {
         />
 
         <DetailPanel
-          location={liveLoc}
+          location={selectedLoc}
           selectedId={selectedId}
           state={state}
           bestId={bestId}

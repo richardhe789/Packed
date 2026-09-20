@@ -188,11 +188,15 @@ export default function DetailPanel({
                       <Wifi size={12} aria-hidden /> Preview
                     </span>
                   )
-                ) : (
+                ) : loc.liveSensor ? (
                   <LiveSourceChip
                     src={reading.src}
                     createdAt={reading.created_at}
                   />
+                ) : (
+                  <span className="sensor-chip">
+                    <Wifi size={12} aria-hidden /> Coming soon
+                  </span>
                 )}
                 {bestId === loc.id ? (
                   <span className="sensor-chip best">Best pick</span>
@@ -247,6 +251,7 @@ export default function DetailPanel({
             </div>
             </div>
             </Dock>
+            {loc.liveSensor ? (
             <Dock
               retracted={graphsRetracted}
               label="people over time"
@@ -272,6 +277,7 @@ export default function DetailPanel({
               }
             />
             </Dock>
+            ) : null}
         </motion.aside>
       ) : null}
     </AnimatePresence>

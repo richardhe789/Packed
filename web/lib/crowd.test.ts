@@ -43,11 +43,12 @@ describe("trendDirection", () => {
 });
 
 describe("LOCATIONS", () => {
-  it("is exactly the one pin from location.config.json", () => {
-    expect(LOCATIONS).toHaveLength(1);
+  it("includes the live ESP pin plus upcoming dining halls", () => {
     expect(LOCATIONS[0]).toEqual(locationFromPlace(placeFromSensor()));
     expect(LOCATIONS[0].id).toBe(SENSOR_LOCATION.id);
     expect(LOCATIONS[0].liveSensor).toBe(true);
+    expect(LOCATIONS.length).toBeGreaterThan(1);
+    expect(LOCATIONS.slice(1).every((l) => !l.liveSensor)).toBe(true);
   });
 });
 
