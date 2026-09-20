@@ -27,12 +27,15 @@ export default function TopBar({ espKind }: Props) {
 
   return (
     <header className="map-topbar">
-      <h1 className="map-topbar-title">
-        <span className="map-topbar-title-shadow" aria-hidden="true">
-          PACKED
-        </span>
-        <span className="map-topbar-title-face">PACKED</span>
-      </h1>
+      <div className="map-topbar-brand">
+        <h1 className="map-topbar-title">
+          <span className="map-topbar-title-shadow" aria-hidden="true">
+            PACKED
+          </span>
+          <span className="map-topbar-title-face">PACKED</span>
+        </h1>
+        <p className="map-topbar-campus">@ Virginia Tech</p>
+      </div>
 
       <div className="topbar-actions">
         <span

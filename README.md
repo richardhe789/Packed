@@ -66,14 +66,6 @@ The baseline is density 0. A manual `S<number>` anchor maps its packet activity 
 
 Status bands: 0–33 Quiet, 34–66 Moderate, 67–100 Busy.
 
-## Screenshots
-
-<p align="center">
-  <img src="./art/packed-logo.png" width="160" height="160" alt="Packed">
-</p>
-
-Add a dashboard screenshot or short demo video here for judging (map with Quiet / Moderate / Busy, and Serial showing a window POST).
-
 ## Collaborators
 
 - [richardhe789](https://github.com/richardhe789)

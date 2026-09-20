@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDownRight,
@@ -68,24 +68,11 @@ export default function DetailPanel({
 }: Props) {
   const reduceMotion = useReducedMotion();
   const reading = selectedId === loc.id ? state[loc.id] : undefined;
-  const dragStartY = useRef<number | null>(null);
   const [front, setFront] = useState<"location" | "graphs">("location");
 
   useEffect(() => {
     setFront("location");
   }, [revealSeq, loc.id]);
-
-  function onHandlePointerDown(e: React.PointerEvent) {
-    dragStartY.current = e.clientY;
-  }
-
-  function onHandlePointerUp(e: React.PointerEvent) {
-    const start = dragStartY.current;
-    dragStartY.current = null;
-    if (start == null) return;
-    const dy = e.clientY - start;
-    if (dy < -40) onExpand();
-  }
 
   return (
     <AnimatePresence mode="wait">
@@ -105,15 +92,6 @@ export default function DetailPanel({
               onBringFront={() => setFront("location")}
             >
             <div className="detail-panel-inner">
-            <button
-              type="button"
-              className="sheet-handle"
-              aria-label={sheetExpanded ? "Collapse details" : "Expand details"}
-              aria-expanded={sheetExpanded}
-              onPointerDown={onHandlePointerDown}
-              onPointerUp={onHandlePointerUp}
-            />
-
             <div
               className="detail-header"
               onClick={
@@ -164,19 +142,7 @@ export default function DetailPanel({
                 onExpand();
               }}
             >
-            <SimGraphs
-              locationId={loc.id}
-              leading={
-                <button
-                  type="button"
-                  className="sheet-handle"
-                  aria-label={sheetExpanded ? "Collapse details" : "Expand details"}
-                  aria-expanded={sheetExpanded}
-                  onPointerDown={onHandlePointerDown}
-                  onPointerUp={onHandlePointerUp}
-                />
-              }
-            />
+            <SimGraphs locationId={loc.id} />
             </Dock>
             ) : null}
         </motion.aside>
