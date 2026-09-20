@@ -1,3 +1,4 @@
+import { CAMPUS_SITES } from "@/lib/campus-sites";
 import { SENSOR_LOCATION } from "@/lib/location.generated";
 
 export type LocationDef = {
@@ -15,7 +16,7 @@ export type ReadingState = {
   prevDensity: number | null;
   avgRssi: number | null;
   packetCount: number | null;
-  /** readings.src — `esp32` or `sim`. Omitted in demo. */
+  /** readings.src — `esp32` or `sim`. */
   src?: string | null;
 };
 
@@ -30,11 +31,11 @@ export type Recommendation = {
   tone: "go" | "neutral";
 };
 
-/** Map camera follows the one configured sensor pin. */
+/** Map camera starts on the live ESP pin, zoomed to show nearby dining halls. */
 export const CAMPUS_VIEW = {
   longitude: SENSOR_LOCATION.longitude,
   latitude: SENSOR_LOCATION.latitude,
-  zoom: 16.6,
+  zoom: 15.4,
 } as const;
 
 export type PlaceFields = {
@@ -64,8 +65,22 @@ export function locationFromPlace(place: PlaceFields): LocationDef {
   };
 }
 
-/** One pin. Name + coordinates come from location.config.json (or the in-app editor). */
-export const LOCATIONS: LocationDef[] = [locationFromPlace(placeFromSensor())];
+export function allLocations(place: PlaceFields): LocationDef[] {
+  const live = locationFromPlace(place);
+  const extras: LocationDef[] = CAMPUS_SITES.filter((s) => s.id !== live.id).map(
+    (s) => ({
+      id: s.id,
+      label: s.label,
+      shortLabel: s.shortLabel,
+      liveSensor: s.liveSensor,
+      coords: { lat: s.coords.lat, lng: s.coords.lng },
+    }),
+  );
+  return [live, ...extras];
+}
+
+/** Live ESP pin first, then halls from campus-sites.ts. */
+export const LOCATIONS: LocationDef[] = allLocations(placeFromSensor());
 
 export const POLL_MS = 5_000;
 export const REC_GAP = 20;
@@ -104,6 +119,16 @@ export function emptyState(): Record<string, ReadingState> {
 export function seedDemoState(at: string | null = null): Record<string, ReadingState> {
   const state: Record<string, ReadingState> = {};
   for (const loc of LOCATIONS) {
+    if (!loc.liveSensor) {
+      state[loc.id] = {
+        density: null,
+        created_at: null,
+        prevDensity: null,
+        avgRssi: null,
+        packetCount: null,
+      };
+      continue;
+    }
     const d = 62;
     state[loc.id] = {
       density: d,
@@ -141,6 +166,7 @@ export function quietestLocationId(
   let best: string | null = null;
   let bestD = Infinity;
   for (const loc of LOCATIONS) {
+    if (!loc.liveSensor) continue;
     const d = state[loc.id].density;
     if (d != null && d < bestD) {
       bestD = d;
@@ -152,21 +178,20 @@ export function quietestLocationId(
 
 export function buildRecommendation(
   state: Record<string, ReadingState>,
-  demoMode: boolean,
 ): Recommendation {
-  const scored = LOCATIONS.map((loc) => ({
-    loc,
-    density: state[loc.id].density,
-  })).filter(
+  const scored = LOCATIONS.filter((loc) => loc.liveSensor)
+    .map((loc) => ({
+      loc,
+      density: state[loc.id].density,
+    }))
+    .filter(
     (x): x is { loc: LocationDef; density: number } => x.density != null,
   );
 
   if (scored.length === 0) {
     return {
       text: "Waiting for crowd data…",
-      detail: demoMode
-        ? "Tap a building or scrub density in the panel."
-        : "ESP32 has not posted a reading yet.",
+      detail: "ESP32 has not posted a reading yet.",
       tone: "neutral",
     };
   }
@@ -176,9 +201,8 @@ export function buildRecommendation(
     const status = statusFromDensity(only.density).label;
     return {
       text: `${only.loc.shortLabel} is ${status}`,
-      detail: demoMode
-        ? "Scrub density in the panel to try Quiet / Moderate / Busy."
-        : "Only one live sensor is online — can’t compare across campus yet.",
+      detail:
+        "Only one live sensor is online — can’t compare across campus yet.",
       tone: "neutral",
     };
   }
@@ -221,13 +245,6 @@ export function formatReadingAge(
   return `${Math.floor(sec / 3600)}h ago`;
 }
 
-export function wantsDemoFromSearch(search: string): boolean {
-  const q = new URLSearchParams(search);
-  if (q.get("demo") === "1" || q.get("demo") === "true") return true;
-  if (q.get("live") === "1" || q.get("live") === "true") return false;
-  return true;
-}
-
 export function parsePlaceFields(raw: unknown): PlaceFields | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -246,9 +263,5 @@ export function parsePlaceFields(raw: unknown): PlaceFields | null {
 }
 
 export const PLACE_STORAGE_KEY = "packed-place";
-
-export function getLocation(id: string): LocationDef | undefined {
-  return LOCATIONS.find((l) => l.id === id);
-}
 
 export { SENSOR_LOCATION };

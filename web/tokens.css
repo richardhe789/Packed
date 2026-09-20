@@ -195,7 +195,7 @@
   --color-paper: oklch(18% 0.018 250);
   --color-paper-2: oklch(22% 0.02 250);
   --color-paper-3: oklch(28% 0.022 250);
-  --color-ink: oklch(96% 0.012 95);
+  --color-ink: oklch(70% 0.012 95);
   --color-ink-2: oklch(78% 0.02 95);
   --color-muted-fg: oklch(68% 0.02 250);
   --color-rule: oklch(36% 0.02 250);

@@ -25,7 +25,7 @@ liveOne[SENSOR_LOCATION.id] = {
   packetCount: null,
 };
 
-const liveRec = buildRecommendation(liveOne, false);
+const liveRec = buildRecommendation(liveOne);
 const pin = locationFromPlace(placeFromSensor());
 assert(liveRec.tone === "neutral", "single live sensor ? neutral");
 assert(
@@ -38,7 +38,7 @@ assert(
 );
 
 const demo = seedDemoState("2020-01-01T00:00:00.000Z");
-const demoRec = buildRecommendation(demo, true);
+const demoRec = buildRecommendation(demo);
 assert(demoRec.tone === "neutral", "one seeded pin ? single-sensor copy");
 assert(
   demoRec.text === `${pin.shortLabel} is Moderate`,
