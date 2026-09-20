@@ -1,6 +1,17 @@
-# Packed
+# Packed — Skip the packed line.
 
-Privacy-preserving campus busyness: an ESP32 turns ambient WiFi noise into a 0–100 density score, and a Next.js map shows Quiet / Moderate / Busy so you can skip the packed line.
+<p align="center">
+  <img src="./art/packed-logo.png" width="200" height="200" alt="Packed">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT License">
+  <img src="https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js">
+  <img src="https://img.shields.io/badge/ESP32-PlatformIO-e11d48?style=flat-square" alt="ESP32">
+  <img src="https://img.shields.io/badge/Supabase-readings-3ecf8e?style=flat-square&logo=supabase&logoColor=white" alt="Supabase">
+</p>
+
+Packed is a privacy-preserving campus busyness sensor. One cheap ESP32 listens to ambient WiFi noise (aggregates only — no MAC addresses), turns that into a 0–100 density score, and a Next.js map shows Quiet / Moderate / Busy so you can skip the packed line.
 
 ## Details
 
