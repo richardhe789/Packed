@@ -27,6 +27,9 @@ static const float BUSY_PACKET_INCREASE_PCT = 20.0f;
 static const float TARGET_BUSY_PACKET_INCREASE_PCT = 100.0f;
 static const float DENSITY_DEADBAND = 8.0f;
 static const int DENSITY_MAX_STEP = 12;
+// Existing NVS baseline/anchor were captured with 30s windows; current short
+// windows are 15s, so normalize those saved packet counts by half.
+static const float SAVED_PACKET_WINDOW_SCALE = 0.5f;
 // Quiet-room calibration uses this many full measurement windows.
 static const uint8_t BASELINE_WINDOWS = 3;
 
@@ -74,6 +77,14 @@ static unsigned long serialAnchorLastByteMs = 0;
 
 static void resetWindowAccumulators();
 static void resetPacketSmoothing();
+
+static float effectiveBaselinePackets() {
+  return baselineAvgPackets * SAVED_PACKET_WINDOW_SCALE;
+}
+
+static float effectiveManualAnchorPackets() {
+  return manualAnchorPackets * SAVED_PACKET_WINDOW_SCALE;
+}
 
 static bool hasPlaceholder(const char *value) {
   return value == nullptr || value[0] == '\0' || String(value).indexOf("YOUR_") >= 0;
@@ -180,7 +191,8 @@ static void loadManualAnchor() {
                   savedLocation.c_str(), LOCATION);
     return;
   }
-  if (baselineValid && savedDensity > 0 && savedPackets <= baselineAvgPackets) {
+  if (baselineValid && savedDensity > 0 &&
+      savedPackets * SAVED_PACKET_WINDOW_SCALE <= effectiveBaselinePackets()) {
     Serial.println(F("[anchor] saved anchor is not above the current quiet baseline; send S<number> again"));
     return;
   }
@@ -228,7 +240,8 @@ static bool saveManualAnchor(int anchorDensity) {
     Serial.println(F("[anchor] density must be an integer from 0 through 100"));
     return false;
   }
-  if (anchorDensity > 0 && latestSmoothedPackets <= baselineAvgPackets) {
+  if (anchorDensity > 0 &&
+      latestSmoothedPackets <= effectiveBaselinePackets()) {
     Serial.println(F("[anchor] packet activity must be above the quiet baseline for a nonzero anchor"));
     return false;
   }
@@ -591,8 +604,11 @@ static void processWindow() {
       rssiDeltaPct = ((baselineAvgRssi - avgRssi) / rssiMagnitude) * 100.0f;
     }
     if (baselineAvgPackets > 0.0f) {
-      packetDeltaPct = ((smoothedPackets - baselineAvgPackets) /
-                        baselineAvgPackets) * 100.0f;
+      const float scaledBaselinePackets = effectiveBaselinePackets();
+      if (scaledBaselinePackets > 0.0f) {
+        packetDeltaPct = ((smoothedPackets - scaledBaselinePackets) /
+                          scaledBaselinePackets) * 100.0f;
+      }
     } else if (smoothedPackets > 0.0f) {
       packetDeltaPct = 100.0f;
     }
@@ -602,21 +618,23 @@ static void processWindow() {
     } else if (fabsf(packetDeltaPct) <= DENSITY_DEADBAND) {
       updateReason = "deadband-hold";
     } else {
+      const float scaledBaselinePackets = effectiveBaselinePackets();
+      const float scaledManualAnchorPackets = effectiveManualAnchorPackets();
       if (manualAnchorValid && manualAnchorDensity > 0 &&
-          manualAnchorPackets > baselineAvgPackets) {
-        const float anchorSpan = manualAnchorPackets - baselineAvgPackets;
-        if (smoothedPackets <= baselineAvgPackets) {
+          scaledManualAnchorPackets > scaledBaselinePackets) {
+        const float anchorSpan = scaledManualAnchorPackets - scaledBaselinePackets;
+        if (smoothedPackets <= scaledBaselinePackets) {
           targetDensity = 0;
           updateReason = "anchor-below-baseline";
-        } else if (smoothedPackets <= manualAnchorPackets) {
+        } else if (smoothedPackets <= scaledManualAnchorPackets) {
           targetDensity = static_cast<int>(roundf(
-              ((smoothedPackets - baselineAvgPackets) / anchorSpan) * manualAnchorDensity));
+              ((smoothedPackets - scaledBaselinePackets) / anchorSpan) * manualAnchorDensity));
           updateReason = "anchor-interpolate";
         } else {
           // Continue at the same slope above the subjective anchor until 100.
           targetDensity = static_cast<int>(roundf(
               manualAnchorDensity +
-              ((smoothedPackets - manualAnchorPackets) / anchorSpan) * manualAnchorDensity));
+              ((smoothedPackets - scaledManualAnchorPackets) / anchorSpan) * manualAnchorDensity));
           updateReason = "anchor-extend";
         }
       } else if (manualAnchorValid) {
