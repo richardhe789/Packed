@@ -3,12 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
-  Activity,
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
   Minus,
   Radio,
   Wifi,
@@ -28,13 +25,8 @@ type Props = {
   selectedId: string | null;
   state: Record<string, ReadingState>;
   bestId: string | null;
-  demoMode: boolean;
   sheetExpanded: boolean;
-  meta: string;
-  liveLoading: boolean;
-  onCollapse: () => void;
   onExpand: () => void;
-  onSlider: (id: string, value: number) => void;
   revealSeq: number;
 };
 
@@ -47,37 +39,19 @@ function TrendGlyph({ dir }: { dir: "up" | "down" | "flat" | "none" }) {
 }
 
 function Dock({
-  retracted,
-  label,
-  onToggle,
   front,
   onBringFront,
   children,
 }: {
-  retracted: boolean;
-  label: string;
-  onToggle: () => void;
   front: boolean;
   onBringFront: () => void;
   children: ReactNode;
 }) {
   return (
     <div
-      className={`detail-dock${retracted ? " is-retracted" : ""}${front ? " is-front" : " is-back"}`}
+      className={`detail-dock${front ? " is-front" : " is-back"}`}
       onClick={front ? undefined : onBringFront}
     >
-      <button
-        type="button"
-        className="dock-toggle"
-        aria-expanded={!retracted}
-        aria-label={retracted ? `Show ${label}` : `Hide ${label}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-      >
-        {retracted ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-      </button>
       {children}
     </div>
   );
@@ -88,25 +62,16 @@ export default function DetailPanel({
   selectedId,
   state,
   bestId,
-  demoMode,
   sheetExpanded,
-  meta,
-  liveLoading,
-  onCollapse,
   onExpand,
-  onSlider,
   revealSeq,
 }: Props) {
   const reduceMotion = useReducedMotion();
   const reading = selectedId === loc.id ? state[loc.id] : undefined;
   const dragStartY = useRef<number | null>(null);
-  const [locRetracted, setLocRetracted] = useState(false);
-  const [graphsRetracted, setGraphsRetracted] = useState(false);
   const [front, setFront] = useState<"location" | "graphs">("location");
 
   useEffect(() => {
-    setLocRetracted(false);
-    setGraphsRetracted(false);
     setFront("location");
   }, [revealSeq, loc.id]);
 
@@ -136,11 +101,8 @@ export default function DetailPanel({
           aria-label={`${loc.label} details`}
         >
             <Dock
-              retracted={locRetracted}
-              label="location"
               front={front === "location"}
               onBringFront={() => setFront("location")}
-              onToggle={() => setLocRetracted((v) => !v)}
             >
             <div className="detail-panel-inner">
             <button
@@ -172,23 +134,12 @@ export default function DetailPanel({
             <DensityBlock
               loc={loc}
               reading={reading}
-              demoMode={demoMode}
               onPeekClick={sheetExpanded ? undefined : onExpand}
             />
 
             <div className="detail-expanded">
               <div className="detail-chips">
-                {demoMode ? (
-                  loc.liveSensor ? (
-                    <span className="sensor-chip live">
-                      <Radio size={12} aria-hidden /> Sensor
-                    </span>
-                  ) : (
-                    <span className="sensor-chip">
-                      <Wifi size={12} aria-hidden /> Preview
-                    </span>
-                  )
-                ) : loc.liveSensor ? (
+                {loc.liveSensor ? (
                   <LiveSourceChip
                     src={reading.src}
                     createdAt={reading.created_at}
@@ -202,69 +153,19 @@ export default function DetailPanel({
                   <span className="sensor-chip best">Best pick</span>
                 ) : null}
               </div>
-
-              {demoMode ? (
-              <p
-                className={`meta-row${!demoMode && liveLoading ? " is-loading" : ""}`}
-                role="status"
-              >
-                {!demoMode && liveLoading ? (
-                  <span className="spinner" aria-hidden />
-                ) : (
-                  <Activity size={14} aria-hidden />
-                )}
-                <span>{meta}</span>
-              </p>
-              ) : null}
-
-              {demoMode ? (
-                <div className="dev-panel embedded">
-                  <h3>Simulate density</h3>
-                  <p className="dev-hint">
-                    Drag to change how busy this spot feels. Pins update live.
-                  </p>
-                  <label className="dev-slider-row">
-                    <span className="dev-slider-label">
-                      {loc.shortLabel}
-                      <span className="dev-slider-val">
-                        {reading.density ?? 0} ·{" "}
-                        {statusFromDensity(reading.density).label}
-                      </span>
-                    </span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={reading.density ?? 0}
-                      className="dev-range"
-                      onChange={(e) => onSlider(loc.id, Number(e.target.value))}
-                    />
-                  </label>
-                </div>
-              ) : null}
-
-              {demoMode ? (
-              <p className="privacy-note">
-                Ambient WiFi activity only — no device tracking, no headcount.
-              </p>
-              ) : null}
             </div>
             </div>
             </Dock>
             {loc.liveSensor ? (
             <Dock
-              retracted={graphsRetracted}
-              label="people over time"
               front={front === "graphs"}
               onBringFront={() => {
                 setFront("graphs");
                 onExpand();
               }}
-              onToggle={() => setGraphsRetracted((v) => !v)}
             >
             <SimGraphs
               locationId={loc.id}
-              live={!demoMode}
               leading={
                 <button
                   type="button"
@@ -328,12 +229,10 @@ function LiveSourceChip({
 function DensityBlock({
   loc,
   reading,
-  demoMode,
   onPeekClick,
 }: {
   loc: LocationDef;
   reading: ReadingState;
-  demoMode: boolean;
   onPeekClick?: () => void;
 }) {
   const status = statusFromDensity(reading.density);
@@ -343,18 +242,17 @@ function DensityBlock({
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
-    if (demoMode || !reading.created_at) return;
+    if (!reading.created_at) return;
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [demoMode, reading.created_at]);
+  }, [reading.created_at]);
 
-  const age = !demoMode ? formatReadingAge(reading.created_at, nowMs) : null;
+  const age = formatReadingAge(reading.created_at, nowMs);
   const clock = reading.created_at
     ? new Date(reading.created_at).toLocaleTimeString()
     : "";
   const when = age ?? (clock ? clock : "");
   const showTelemetry =
-    !demoMode &&
     loc.liveSensor &&
     (reading.avgRssi != null || reading.packetCount != null);
 

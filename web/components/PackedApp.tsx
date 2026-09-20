@@ -19,6 +19,7 @@ import {
 } from "@/lib/crowd";
 import { fetchLatestReadings } from "@/lib/supabase";
 import DetailPanel from "@/components/DetailPanel";
+import LocationSearch from "@/components/LocationSearch";
 import TopBar from "@/components/TopBar";
 
 const CampusMap = dynamic(() => import("@/components/CampusMap"), {
@@ -34,23 +35,16 @@ function isAbortError(err: unknown): boolean {
 }
 
 export default function PackedApp() {
-  const demoMode = false;
   const [place, setPlace] = useState<PlaceFields>(placeFromSensor);
   const [selectedId, setSelectedId] = useState<string | null>(
     SENSOR_LOCATION.id,
   );
   const locations = useMemo(() => allLocations(place), [place]);
-  const liveLoc = useMemo(
-    () => locations.find((l) => l.id === SENSOR_LOCATION.id) ?? locations[0],
-    [locations],
-  );
   const selectedLoc = useMemo(
-    () => locations.find((l) => l.id === selectedId) ?? liveLoc,
-    [locations, selectedId, liveLoc],
+    () => locations.find((l) => l.id === selectedId) ?? locations[0],
+    [locations, selectedId],
   );
   const [state, setState] = useState<Record<string, ReadingState>>(emptyState);
-  const [meta, setMeta] = useState("Live · fetching…");
-  const [liveLoading, setLiveLoading] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const [revealSeq, setRevealSeq] = useState(0);
 
@@ -85,7 +79,6 @@ export default function PackedApp() {
       const signal = controller.signal;
       const gen = ++liveGenerationRef.current;
 
-      setLiveLoading(true);
       try {
         const liveIds = LOCATIONS.filter((l) => l.liveSensor).map((l) => l.id);
         const results = await Promise.all(
@@ -113,34 +106,10 @@ export default function PackedApp() {
           }
           return next;
         });
-        const latestRow = results[0]?.latest ?? null;
-        const kind = liveSourceKind(
-          latestRow?.src,
-          latestRow?.created_at ?? null,
-          Date.now(),
-        );
-        if (kind === "sim") {
-          setMeta("Simulated · sim_readings / src=sim · not a plugged-in ESP32");
-        } else if (kind === "stale") {
-          setMeta(
-            "Last ESP32 row in readings · sensor not posting · dashboard still polls",
-          );
-        } else if (kind === "none") {
-          setMeta(`No ESP32 rows in readings yet · polling every ${POLL_MS / 1000}s`);
-        } else {
-          setMeta(`ESP32 posting · dashboard poll every ${POLL_MS / 1000}s`);
-        }
       } catch (err) {
         if (isAbortError(err) || signal.aborted) return;
         if (gen !== liveGenerationRef.current) return;
         console.error(err);
-        setMeta(
-          `Live error: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      } finally {
-        if (gen === liveGenerationRef.current) {
-          setLiveLoading(false);
-        }
       }
     };
 
@@ -186,58 +155,22 @@ export default function PackedApp() {
     };
   }, []);
 
-  const recommendation = useMemo(
-    () => buildRecommendation(state, demoMode),
-    [state, demoMode],
-  );
+  const recommendation = useMemo(() => buildRecommendation(state), [state]);
 
   const bestId = useMemo(() => {
     if (recommendation.tone !== "go") return null;
     return quietestLocationId(state);
   }, [recommendation.tone, state]);
 
-  function onSlider(id: string, value: number) {
-    setState((prev) => ({
-      ...prev,
-      [id]: {
-        prevDensity: prev[id].density,
-        density: value,
-        created_at: new Date().toISOString(),
-        avgRssi: prev[id].avgRssi,
-        packetCount: prev[id].packetCount,
-        src: prev[id].src,
-      },
-    }));
-  }
-
   return (
-    <div
-      className="map-shell"
-      data-sheet-expanded={sheetExpanded ? "true" : "false"}
-      data-demo={demoMode ? "true" : "false"}
-    >
-      <TopBar
-        espKind={liveSourceKind(
-          state[SENSOR_LOCATION.id]?.src,
-          state[SENSOR_LOCATION.id]?.created_at ?? null,
-          Date.now(),
-        )}
-      />
-
-      <div className="map-stage">
-        <CampusMap
-          locations={locations}
-          location={selectedLoc}
-          state={state}
-          selectedId={selectedId}
-          bestId={bestId}
-          demoMode={demoMode}
-          sheetExpanded={sheetExpanded}
-          onSelect={(id) => {
-            setSelectedId(id);
-            setSheetExpanded(true);
-            setRevealSeq((n) => n + 1);
-          }}
+    <div className="map-shell">
+      <aside className="app-sidebar">
+        <TopBar
+          espKind={liveSourceKind(
+            state[SENSOR_LOCATION.id]?.src,
+            state[SENSOR_LOCATION.id]?.created_at ?? null,
+            Date.now(),
+          )}
         />
 
         <DetailPanel
@@ -245,14 +178,32 @@ export default function PackedApp() {
           selectedId={selectedId}
           state={state}
           bestId={bestId}
-          demoMode={demoMode}
           sheetExpanded={sheetExpanded}
-          meta={meta}
-          liveLoading={liveLoading}
-          onCollapse={() => setSheetExpanded(false)}
           onExpand={() => setSheetExpanded(true)}
-          onSlider={onSlider}
           revealSeq={revealSeq}
+        />
+      </aside>
+
+      <div className="map-stage">
+        <LocationSearch
+          locations={locations}
+          onPick={(id) => {
+            setSelectedId(id);
+            setSheetExpanded(true);
+            setRevealSeq((n) => n + 1);
+          }}
+        />
+        <CampusMap
+          locations={locations}
+          location={selectedLoc}
+          state={state}
+          selectedId={selectedId}
+          bestId={bestId}
+          onSelect={(id) => {
+            setSelectedId(id);
+            setSheetExpanded(true);
+            setRevealSeq((n) => n + 1);
+          }}
         />
       </div>
     </div>

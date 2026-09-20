@@ -16,7 +16,7 @@ export type ReadingState = {
   prevDensity: number | null;
   avgRssi: number | null;
   packetCount: number | null;
-  /** readings.src — `esp32` or `sim`. Omitted in demo. */
+  /** readings.src — `esp32` or `sim`. */
   src?: string | null;
 };
 
@@ -178,7 +178,6 @@ export function quietestLocationId(
 
 export function buildRecommendation(
   state: Record<string, ReadingState>,
-  demoMode: boolean,
 ): Recommendation {
   const scored = LOCATIONS.filter((loc) => loc.liveSensor)
     .map((loc) => ({
@@ -192,9 +191,7 @@ export function buildRecommendation(
   if (scored.length === 0) {
     return {
       text: "Waiting for crowd data…",
-      detail: demoMode
-        ? "Tap a building or scrub density in the panel."
-        : "ESP32 has not posted a reading yet.",
+      detail: "ESP32 has not posted a reading yet.",
       tone: "neutral",
     };
   }
@@ -204,9 +201,8 @@ export function buildRecommendation(
     const status = statusFromDensity(only.density).label;
     return {
       text: `${only.loc.shortLabel} is ${status}`,
-      detail: demoMode
-        ? "Scrub density in the panel to try Quiet / Moderate / Busy."
-        : "Only one live sensor is online — can’t compare across campus yet.",
+      detail:
+        "Only one live sensor is online — can’t compare across campus yet.",
       tone: "neutral",
     };
   }
@@ -249,13 +245,6 @@ export function formatReadingAge(
   return `${Math.floor(sec / 3600)}h ago`;
 }
 
-export function wantsDemoFromSearch(search: string): boolean {
-  const q = new URLSearchParams(search);
-  if (q.get("demo") === "1" || q.get("demo") === "true") return true;
-  if (q.get("live") === "1" || q.get("live") === "true") return false;
-  return true;
-}
-
 export function parsePlaceFields(raw: unknown): PlaceFields | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -274,9 +263,5 @@ export function parsePlaceFields(raw: unknown): PlaceFields | null {
 }
 
 export const PLACE_STORAGE_KEY = "packed-place";
-
-export function getLocation(id: string): LocationDef | undefined {
-  return LOCATIONS.find((l) => l.id === id);
-}
 
 export { SENSOR_LOCATION };

@@ -22,14 +22,39 @@ type Props = {
   state: Record<string, ReadingState>;
   selectedId: string | null;
   bestId: string | null;
-  demoMode: boolean;
-  sheetExpanded: boolean;
   onSelect: (id: string) => void;
 };
 
 type PinScreen = { id: string; x: number; y: number };
 
-const OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const OPENFREEMAP_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
+const OPENFREEMAP_DARK = "https://tiles.openfreemap.org/styles/fiord";
+
+function openFreeMapStyle(): string {
+  return document.documentElement.getAttribute("data-theme") === "dark"
+    ? OPENFREEMAP_DARK
+    : OPENFREEMAP_LIGHT;
+}
+
+function ensureBuildings3d(map: MapLibreMap) {
+  if (map.getLayer("building-3d") || !map.getSource("openmaptiles")) return;
+  map.addLayer({
+    id: "building-3d",
+    type: "fill-extrusion",
+    source: "openmaptiles",
+    "source-layer": "building",
+    minzoom: 14,
+    paint: {
+      "fill-extrusion-base": ["get", "render_min_height"],
+      "fill-extrusion-color": "#8b95a8",
+      "fill-extrusion-height": ["get", "render_height"],
+      "fill-extrusion-opacity": 0.82,
+    },
+  });
+  if (map.getLayer("building")) {
+    map.setLayoutProperty("building", "visibility", "none");
+  }
+}
 
 // Next/Turbopack breaks MapLibre's bundled worker → blank basemap, pins still work.
 // Serve worker + shared sibling from /public (both required; worker imports the sibling).
@@ -40,7 +65,7 @@ function ensureMapLibreWorker() {
   workerConfigured = true;
 }
 
-function mapBottomPad(_expanded: boolean, _demoMode: boolean) {
+function mapBottomPad() {
   if (typeof window === "undefined") return 0;
   if (!window.matchMedia("(max-width: 51.1875rem)").matches) return 0;
   return Math.min(window.innerHeight * 0.52, 420);
@@ -52,8 +77,6 @@ export default function CampusMap({
   state,
   selectedId,
   bestId,
-  demoMode,
-  sheetExpanded,
   onSelect,
 }: Props) {
   const reduceMotion = useReducedMotion();
@@ -79,7 +102,7 @@ export default function CampusMap({
     let cancelled = false;
     const map = new MapLibreMap({
       container: el,
-      style: OPENFREEMAP_STYLE_URL,
+      style: openFreeMapStyle(),
       center: [location.coords.lng, location.coords.lat],
       zoom: CAMPUS_VIEW.zoom,
       attributionControl: { compact: true },
@@ -119,6 +142,9 @@ export default function CampusMap({
       markReady();
     };
 
+    map.on("load", () => {
+      if (!cancelled) ensureBuildings3d(map);
+    });
     map.once("load", markReadyOnce);
 
     // Pins even if style paint is slow
@@ -142,6 +168,40 @@ export default function CampusMap({
       if (mapRef.current === map) mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapEpoch === 0) return;
+
+    let current = openFreeMapStyle();
+
+    function applyPad() {
+      map.setPadding({
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: mapBottomPad(),
+      });
+    }
+
+    function onTheme() {
+      const next = openFreeMapStyle();
+      if (next === current) return;
+      current = next;
+      map.setStyle(next);
+      map.once("idle", () => {
+        ensureBuildings3d(map);
+        applyPad();
+      });
+    }
+
+    const mo = new MutationObserver(onTheme);
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => mo.disconnect();
+  }, [mapEpoch]);
 
   // Project building coords → screen pixels (pins sit above vignette, outside MapLibre DOM).
   useEffect(() => {
@@ -186,13 +246,13 @@ export default function CampusMap({
         top: 0,
         left: 0,
         right: 0,
-        bottom: mapBottomPad(sheetExpanded, demoMode),
+        bottom: mapBottomPad(),
       });
     };
     apply();
     window.addEventListener("resize", apply);
     return () => window.removeEventListener("resize", apply);
-  }, [mapEpoch, sheetExpanded, demoMode]);
+  }, [mapEpoch]);
 
   return (
     <div className="map-canvas">
@@ -209,7 +269,6 @@ export default function CampusMap({
           const pending = !loc.liveSensor;
           const pulse =
             !pending &&
-            !demoMode &&
             liveSourceKind(reading?.src, reading?.created_at ?? null, Date.now()) ===
               "live" &&
             !reduceMotion;

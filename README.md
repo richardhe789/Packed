@@ -1,265 +1,43 @@
+# Packed
+
+Privacy-preserving campus busyness: an ESP32 turns ambient WiFi noise into a 0–100 density score, and a Next.js map shows Quiet / Moderate / Busy so you can skip the packed line.
+
+## Details
+
+- **What problem does this project solve?** At Virginia Tech (and most campuses), dining halls and study spots are a coin flip — you walk over and the line is empty or a 20-minute wait, with no honest public signal for “how packed is it right now?” Cameras feel creepy and expensive; campus WiFi login data isn’t something students can see. Packed is a cheap relative-busyness kit: one ESP32 listens to ambient RF (average RSSI + packet activity only — no MAC addresses), posts a density reading, and a campus map answers the glanceable question: should I go now?
+- **Did you use any interesting libraries or services?** ESP32 firmware (PlatformIO, promiscuous WiFi sniff + HTTPS uplink over a phone hotspot), Supabase (`readings` table + `ingest-reading` Edge Function with a device key), Next.js 15 on Vercel, MapLibre / `react-map-gl` for the campus map, Framer Motion and Lucide for the UI.
+- **What extension type(s) did you build?** None — this is not a browser extension. The submission is ESP32 firmware plus a Next.js web dashboard (Demo mode with seeded densities; Live mode polls one real sensor).
+- **If given longer, what would the next improvement you would make?** Put a second node at a real chokepoint (e.g. Dietrick), calibrate thresholds against lunch traffic, and make Live recommendations compare two real sensors instead of one honest pin plus placeholders.
+
+## Set Up Instructions
+
+**Accounts:** a [Supabase](https://supabase.com) project (Postgres + Edge Functions). Optional: [Vercel](https://vercel.com) to host `web/`. Firmware talks to a phone hotspot, not campus WiFi.
+
+### Web (no hardware)
+
+1. Copy `web/.env.example` → `web/.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+2. In the Supabase SQL editor, run `supabase/schema.sql`. Deploy `supabase/functions/ingest-reading/` and set the `DEVICE_INGEST_KEY` secret (same value the ESP32 will use).
+3. From `web/`: `pnpm install` then `pnpm dev`. Open [http://localhost:3000](http://localhost:3000). Demo is the default (`?demo=1` / `?live=1` or the in-app toggle).
+
+**Vercel:** import the repo, set Root Directory to `web`, add the two `NEXT_PUBLIC_SUPABASE_*` env vars.
+
+### Firmware (ESP32)
+
+1. Copy `firmware/include/config.h.example` → `firmware/include/config.h` (gitignored). Fill hotspot `WIFI_SSID` / `WIFI_PASSWORD`, `SUPABASE_URL` / anon `SUPABASE_API_KEY`, and `DEVICE_INGEST_KEY`.
+2. Set the one testing location (id, label, lat/lng) in [`location.config.json`](location.config.json). See [`LOCATION.md`](LOCATION.md).
+3. Open `firmware/` in PlatformIO. Default env is `esp32dev_short` (~30s windows). Serial at **115200**.
+
+Status bands: 0–33 Quiet, 34–66 Moderate, 67–100 Busy. Live polls the ID in `location.config.json` about every 30s; other map pins are placeholders.
+
+## Screenshots
+
 <p align="center">
   <img src="./art/packed-logo.png" width="160" height="160" alt="Packed">
 </p>
 
-<p align="center">
-  <strong>Ambient WiFi density · ESP32 · Supabase · Next.js campus map</strong>
-</p>
+Add a dashboard screenshot or short demo video here for judging (map with Quiet / Moderate / Busy, Demo vs Live toggle, and Serial showing a window POST).
 
-<p align="center">
-  <img src="https://img.shields.io/badge/status-hackathon%20MVP-111111?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/version-0.1.0-0ea5e9?style=flat-square" alt="Version">
-  <img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js">
-  <img src="https://img.shields.io/badge/ESP32-PlatformIO-e11d48?style=flat-square" alt="ESP32">
-  <img src="https://img.shields.io/badge/Supabase-readings-3ecf8e?style=flat-square&logo=supabase&logoColor=white" alt="Supabase">
-</p>
+## Collaborators
 
-<p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#usage">Usage</a> ·
-  <a href="#architecture">Architecture</a> ·
-  <a href="./NEXT_STEPS.md">Roadmap</a> ·
-  <a href="./PRESENTATION.md">Pitch script</a>
-</p>
-
----
-
-**Packed** is a **privacy-preserving campus busyness sensor**. One cheap ESP32 listens to ambient WiFi noise (aggregates only — no MACs), turns that into a **0–100 density score**, and a Next.js map shows **Quiet / Moderate / Busy** so you can skip the packed line.
-
-If you want **“how busy is this dining hall right now?”** without cameras, without tracking phones, and without a campus IT integration — use Packed.
-
-> **Status:** hackathon MVP. Single live sensor at Goodwin Hall (Virginia Tech). Demo mode seeds that pin.
-
-## Table of contents
-
-- [Why Packed](#why-packed)
-- [Features](#features)
-- [Quick start](#quick-start)
-- [Usage](#usage)
-- [Architecture](#architecture)
-- [Firmware](#firmware)
-- [Supabase](#supabase)
-- [Web UI](#web-ui)
-- [Privacy](#privacy)
-- [Requirements](#requirements)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Why Packed
-
-| You want… | Packed gives you… |
-| --- | --- |
-| A glanceable “should I go now?” | Quiet / Moderate / Busy on a campus map |
-| No cameras, no headcount | Ambient RF: average RSSI + packet activity |
-| Hardware you can demo | One ESP32, phone hotspot, HTTPS to Supabase |
-| A UI without the sensor | Demo mode with seeded densities + sliders |
-| A path to more buildings | Live polls one location; map holds placeholders |
-
-**Not for you if** you need exact occupancy, MAC tracking, entry/exit counting, enterprise campus WiFi auth, or a multi-sensor fusion pipeline. Packed is a **relative busyness kit**, not a people counter.
-
-**Building a pitch?** See [`PRESENTATION.md`](PRESENTATION.md). **After the hackathon?** See [`NEXT_STEPS.md`](NEXT_STEPS.md).
-
-## Features
-
-- **Aggregates only** — firmware never extracts or stores MAC addresses
-- **On-device density** — 30s short windows by default for demos (5 min via `esp32dev`), 0–100 accumulator
-- **Hotspot uplink** — ESP32 STA on a phone AP, not campus WiFi
-- **Supabase `readings`** — RSSI, packet count, density, location
-- **Next.js dashboard** — MapLibre campus map, Demo / Live toggle
-- **Recommendation strip** — quieter spot when densities actually differ
-- **Dark mode** — first-class theme on the web app
-- **Hackathon-honest Live** — one real sensor; other pins are placeholders
-
-## Quick start
-
-### Web (no hardware)
-
-```bash
-cd web
-cp .env.example .env.local   # Supabase URL + anon key
-pnpm install
-pnpm dev
-```
-
-Open [http://localhost:3000](http://localhost:3000). Demo is the default. Use the **Demo** / **Live** toggle, or `?demo=1` / `?live=1`.
-
-### Firmware (ESP32)
-
-```text
-firmware/include/config.h.example  →  firmware/include/config.h
-```
-
-Fill `WIFI_SSID` / `WIFI_PASSWORD` (phone hotspot), `SUPABASE_URL` / `SUPABASE_API_KEY` (anon key), and `DEVICE_INGEST_KEY` (must match the Edge Function secret). Configure the manual location only in root [`location.config.json`](location.config.json): ID, label, latitude, and longitude. Build and upload with [PlatformIO](https://platformio.org/) — default env is `esp32dev_short` (~30s windows for judging). Serial at **115200**.
-
-That is the path: **copy env → run the map**, or **copy `config.h` → flash the sensor**.
-
-## Usage
-
-### Status bands
-
-| Density | Label |
-| --- | --- |
-| 0–33 | Quiet |
-| 34–66 | Moderate |
-| 67–100 | Busy |
-
-### Demo vs Live
-
-- **Demo** — seeded crowd levels and sliders. No ESP32 required. Best for the multi-building “go here, not there” story.
-- **Live** — polls Supabase for the ID in `location.config.json` about every 30s. Honest story today: how packed is **this room** (one ESP32). Other map pins are Preview, not live sensors.
-
-### Venue loop
-
-1. Phone hotspot on; ESP32 powered; Serial shows connect + sniff.
-2. Wait one window (or `esp32dev_short`); confirm a row in Supabase.
-3. Open the app → **Live**; status should match density.
-4. Walk the chokepoint; watch Serial `%Δ` and retune thresholds.
-
-## Architecture
-
-```
-Ambient WiFi frames
-  → ESP32 (promiscuous sniff, on-device density)
-  → Phone hotspot (STA uplink)
-  → Supabase `readings`
-  → Next.js app in web/ (Demo locally, Live poll ~30s)
-```
-
-## Repo layout
-
-| Path | Purpose |
-| --- | --- |
-| `firmware/` | PlatformIO ESP32 firmware |
-| `web/` | Next.js App Router UI (Vercel root) |
-| `firmware/include/config.h.example` | WiFi + Supabase secrets template |
-| `web/.env.example` | Next.js Supabase env template |
-| [`location.config.json`](location.config.json) | The one manual ESP32/dashboard testing location |
-| [`LOCATION.md`](LOCATION.md) | Move-the-sensor instructions |
-| `art/packed-logo.png` | Product logo |
-| [`NEXT_STEPS.md`](NEXT_STEPS.md) | Post-hackathon roadmap |
-| [`PRESENTATION.md`](PRESENTATION.md) | Judge demo script |
-
-## Firmware
-
-PlatformIO may regenerate `compile_commands.json` locally; it is gitignored.
-
-1. Install PlatformIO (VS Code / Cursor extension is fine).
-2. Copy `config.h.example` → `config.h` (gitignored).
-3. Fill in hotspot WiFi, `SUPABASE_URL` / anon `SUPABASE_API_KEY`, and `DEVICE_INGEST_KEY` (must match the `ingest-reading` Edge Function secret). Set the location ID, label, and Google Maps coordinates only in root `location.config.json`.
-4. Open `firmware/`, build & upload.
-5. Serial Monitor at **115200**.
-
-### What you should see
-
-```text
-[wifi] connected, IP: 192.168.x.x  channel: N
-[scan] Nearby APs ...
-[sniff] promiscuous ON on channel N
-[ready] window=300000 ms ...
----------- window ----------
-  avg_rssi=...  packet_count=...
-  density=...
-[http] POST ok ...
-```
-
-### Tunables (`firmware/src/main.cpp`)
-
-| Constant | Default | Meaning |
-| --- | --- | --- |
-| `RSSI_THRESHOLD` | 10 | % RSSI drop required |
-| `PACKET_THRESHOLD` | 15 | % packet-count rise required |
-| `STEP_UP` / `STEP_DOWN` | 10 / 5 | Density accumulator steps |
-| `WINDOW_MS` | 30s (`esp32dev_short`, default) / 5 min (`esp32dev`) | Averaging window |
-
-### Radio notes
-
-- Default sniff channel = hotspot AP channel (`SNIFF_CHANNEL 0`).
-- At the venue, use a WiFi analyzer or the boot `[scan]` log for campus AP channels.
-- To sniff another channel, `#define SNIFF_CHANNEL N` — firmware pauses sniff → reconnects STA → POSTs → resumes sniff.
-- **Top risk:** promiscuous + STA + HTTPS on one radio. If POST fails while sniffing, check Serial.
-
-## Supabase
-
-Table `public.readings`:
-
-| Column | Type |
-| --- | --- |
-| `id` | bigint identity PK |
-| `created_at` | timestamptz default now() |
-| `avg_rssi` | float |
-| `packet_count` | int |
-| `density` | int 0–100 |
-| `location` | text |
-| `src` | text (`esp32` on `readings`, `sim` on `sim_readings`) |
-
-Fake movement lives in a separate table, `public.sim_readings` (same columns, no ESP32 rows). Open **Table Editor → `sim_readings`**. Re-seed with [`supabase/sim_readings.sql`](supabase/sim_readings.sql). Remove later with:
-
-```sql
-delete from public.sim_readings;
-```
-
-RLS: anon can **`SELECT`** only (Live dashboard). **Inserts** go through the `ingest-reading` Edge Function (`supabase/functions/ingest-reading/`), which checks `x-device-key` against the `DEVICE_INGEST_KEY` secret and writes with the service role.
-Smoke tests (replace env vars locally — do not commit values):
-
-```bash
-# Live read path (anon) — should return 200
-curl "https://myjfbuathehfghagbnot.supabase.co/rest/v1/readings?select=density,location&limit=1" \
-  -H "apikey: $ANON_KEY" \
-  -H "Authorization: Bearer $ANON_KEY"
-
-# Device ingest — should return 200 and insert a row
-curl -X POST "https://myjfbuathehfghagbnot.supabase.co/functions/v1/ingest-reading" \
-  -H "apikey: $ANON_KEY" \
-  -H "Authorization: Bearer $ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -H "x-device-key: $DEVICE_INGEST_KEY" \
--d "{\"avg_rssi\":-60,\"packet_count\":100,\"density\":50,\"location\":\"goodwin_hall\"}"
-```
-
-The firmware and dashboard use the same ID from `location.config.json`; the live marker also uses its label and manual coordinates. No GPS or automatic location detection is used.
-
-## Web UI
-
-App is standardized on **pnpm**. Copy `web/.env.example` → `web/.env.local`:
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-### Deploy on Vercel
-
-1. Import this repo.
-2. Set **Root Directory** to `web`.
-3. Add the two `NEXT_PUBLIC_SUPABASE_*` env vars (Production + Preview).
-4. Deploy. The browser talks to Supabase REST directly — no custom API routes required.
-
-## Privacy
-
-Firmware never reads or stores MAC addresses — only RSSI sums and packet counts. Relative change in the RF environment, not “there are exactly N people.”
-
-## Out of scope
-
-MAC tracking, entry/exit counting, multi-sensor logic, historical “come back in 15 min” prediction, campus WiFi enterprise auth.
-
-## Requirements
-
-- **Web:** Node.js + [pnpm](https://pnpm.io/), Next.js 15
-- **Firmware:** PHP not required — PlatformIO + ESP32
-- **Backend:** a Supabase project with the `readings` table
-- **Demo uplink:** a phone hotspot the ESP32 can join
-
-## Contributing
-
-This started as a VTHacks MVP (formerly Campus Crowd / ProjectSolver). Issues and PRs that tighten calibration, Live coverage, or campus config are welcome. Read [`NEXT_STEPS.md`](NEXT_STEPS.md) before adding product surface.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
-
----
-
-<p align="center">
-  Skip the packed line.
-  ·
-  <code>Packed</code>
-</p>
+- [richardhe789](https://github.com/richardhe789)
+- [jmyz23](https://github.com/jmyz23)

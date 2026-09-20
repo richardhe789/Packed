@@ -44,7 +44,23 @@ export default function TopBar({ espKind }: Props) {
 
         <button
           type="button"
-          className="icon-btn"
+          className={`theme-switch${theme === "dark" ? " is-dark" : ""}`}
+          role="switch"
+          aria-checked={theme === "dark"}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={theme === "dark" ? "Light mode" : "Dark mode"}
+          onClick={() => setTheme((t) => toggleTheme(t))}
+        >
+          <span className="theme-switch-track" aria-hidden>
+            <Sun size={12} className="theme-switch-icon theme-switch-sun" />
+            <Moon size={12} className="theme-switch-icon theme-switch-moon" />
+          </span>
+          <span className="theme-switch-thumb" aria-hidden />
+        </button>
+
+        <button
+          type="button"
+          className="icon-btn theme-toggle-btn"
           aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           title={theme === "dark" ? "Light mode" : "Dark mode"}
           onClick={() => setTheme((t) => toggleTheme(t))}

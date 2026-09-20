@@ -116,15 +116,10 @@ describe("seedDemoState", () => {
 
 describe("buildRecommendation", () => {
   it("returns waiting copy when all densities are empty", () => {
-    const state = emptyState();
-    const demo = buildRecommendation(state, true);
-    const live = buildRecommendation(state, false);
-
-    expect(demo.text).toBe("Waiting for crowd data…");
-    expect(live.text).toBe("Waiting for crowd data…");
-    expect(demo.detail).toBe("Tap a building or scrub density in the panel.");
-    expect(live.detail).toBe("ESP32 has not posted a reading yet.");
-    expect(demo.tone).toBe("neutral");
+    const rec = buildRecommendation(emptyState());
+    expect(rec.text).toBe("Waiting for crowd data…");
+    expect(rec.detail).toBe("ESP32 has not posted a reading yet.");
+    expect(rec.tone).toBe("neutral");
   });
 
   it("returns single-sensor status copy when the live pin has density", () => {
@@ -136,7 +131,7 @@ describe("buildRecommendation", () => {
       avgRssi: null,
       packetCount: null,
     };
-    const rec = buildRecommendation(state, false);
+    const rec = buildRecommendation(state);
     expect(rec.text).toBe(`${LOCATIONS[0].shortLabel} is Busy`);
     expect(rec.detail).toBe(
       "Only one live sensor is online — can’t compare across campus yet.",
