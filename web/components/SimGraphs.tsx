@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { POLL_MS } from "@/lib/crowd";
 import type { HistoryPoint } from "@/lib/sim";
 import { fetchReadingHistory } from "@/lib/supabase";
@@ -11,7 +11,6 @@ const Y_MAX = 100;
 
 type Props = {
   locationId: string;
-  leading?: ReactNode;
 };
 
 function clockLabel(iso: string): string {
@@ -42,7 +41,7 @@ function plot(rows: HistoryPoint[], y0: number, y1: number) {
   return { pts, yTicks, xTicks, innerH };
 }
 
-export default function SimGraphs({ locationId, leading }: Props) {
+export default function SimGraphs({ locationId }: Props) {
   const [rows, setRows] = useState<HistoryPoint[]>([]);
 
   useEffect(() => {
@@ -76,7 +75,6 @@ export default function SimGraphs({ locationId, leading }: Props) {
   if (rows.length < 2) {
     return (
       <section className="detail-panel-inner sim-graphs" aria-label="People over time">
-        {leading}
         <p className="sim-graphs-title">People over time</p>
         <p className="dev-hint">Need at least two ESP32 readings to graph.</p>
       </section>
@@ -93,7 +91,6 @@ export default function SimGraphs({ locationId, leading }: Props) {
 
   return (
     <section className="detail-panel-inner sim-graphs" aria-label="People over time">
-      {leading}
       <div className="sim-graphs-stage">
         <svg
           className="sim-graphs-chart"
